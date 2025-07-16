@@ -1,0 +1,50 @@
+{
+  "name": "secure-vm-portal",
+  "version": "2.0.0",
+  "description": "Secure Virtual Machine Work Logging Portal - Production Ready",
+  "main": "index.js",
+  "scripts": {
+    "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "setup": "./scripts/setup/install-dependencies.sh && ./scripts/setup/setup-database.sh",
+    "dev": "./scripts/start-dev.sh",
+    "build": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "start": "cd backend && npm start",
+    "test": "cd backend && npm test && cd ../frontend && npm test",
+    "lint": "cd backend && npm run lint && cd ../frontend && npm run lint",
+    "migrate": "cd backend && npm run migrate",
+    "seed": "cd backend && npm run seed",
+    "deploy-db": "node scripts/deploy-database.js",
+    "deploy": "npm run build && npm run deploy-db",
+    "prepare-deployment": "node scripts/prepare-deployment.js",
+    "postinstall": "echo 'Secure VM Portal dependencies installed successfully'"
+  },
+  "keywords": [
+    "vm-portal",
+    "work-logging",
+    "azure-ad",
+    "secure-access",
+    "time-tracking",
+    "project-management",
+    "task-management",
+    "render-deployment"
+  ],
+  "author": "Blumotiv",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/connectbm/secure-vm-portal.git"
+  },
+  "homepage": "https://secure-vm-portal-frontend.onrender.com",
+  "bugs": {
+    "url": "https://github.com/connectbm/secure-vm-portal/issues"
+  }
+}

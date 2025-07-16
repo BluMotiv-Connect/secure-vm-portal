@@ -1,0 +1,55 @@
+{
+  "scan_timestamp": "C:\\Users\\svivi\\OneDrive\\Desktop\\secure-vm-portal",
+  "total_empty_files": 7,
+  "empty_files": [
+    {
+      "path": "README.md",
+      "full_path": "C:\\Users\\svivi\\OneDrive\\Desktop\\secure-vm-portal\\README.md",
+      "directory": "",
+      "filename": "README.md",
+      "extension": ".md"
+    },
+    {
+      "path": "docs\\ADMIN_GUIDE.md",
+      "full_path": "C:\\Users\\svivi\\OneDrive\\Desktop\\secure-vm-portal\\docs\\ADMIN_GUIDE.md",
+      "directory": "docs",
+      "filename": "ADMIN_GUIDE.md",
+      "extension": ".md"
+    },
+    {
+      "path": "docs\\API.md",
+      "full_path": "C:\\Users\\svivi\\OneDrive\\Desktop\\secure-vm-portal\\docs\\API.md",
+      "directory": "docs",
+      "filename": "API.md",
+      "extension": ".md"
+    },
+    {
+      "path": "docs\\ARCHITECTURE.md",
+      "full_path": "C:\\Users\\svivi\\OneDrive\\Desktop\\secure-vm-portal\\docs\\ARCHITECTURE.md",
+      "directory": "docs",
+      "filename": "ARCHITECTURE.md",
+      "extension": ".md"
+    },
+    {
+      "path": "docs\\DEPLOYMENT.md",
+      "full_path": "C:\\Users\\svivi\\OneDrive\\Desktop\\secure-vm-portal\\docs\\DEPLOYMENT.md",
+      "directory": "docs",
+      "filename": "DEPLOYMENT.md",
+      "extension": ".md"
+    },
+    {
+      "path": "docs\\USER_GUIDE.md",
+      "full_path": "C:\\Users\\svivi\\OneDrive\\Desktop\\secure-vm-portal\\docs\\USER_GUIDE.md",
+      "directory": "docs",
+      "filename": "USER_GUIDE.md",
+      "extension": ".md"
+    },
+    {
+      "path": "frontend\\public\\favicon.ico",
+      "full_path": "C:\\Users\\svivi\\OneDrive\\Desktop\\secure-vm-portal\\frontend\\public\\favicon.ico",
+      "directory": "frontend\\public",
+      "filename": "favicon.ico",
+      "extension": ".ico"
+    }
+  ]
+}

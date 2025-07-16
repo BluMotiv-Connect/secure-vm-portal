@@ -1,0 +1,242 @@
+/* Component-specific styles */
+
+/* Loading states */
+.loading-skeleton {
+  @apply animate-pulse;
+}
+
+.loading-skeleton-text {
+  @apply h-4 bg-gray-200 rounded w-3/4;
+}
+
+.loading-skeleton-avatar {
+  @apply h-10 w-10 bg-gray-200 rounded-full;
+}
+
+.loading-skeleton-button {
+  @apply h-10 bg-gray-200 rounded w-24;
+}
+
+/* Data table styles */
+.data-table {
+  @apply w-full border-collapse;
+}
+
+.data-table th {
+  @apply px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50;
+}
+
+.data-table td {
+  @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900;
+}
+
+.data-table tr:hover {
+  @apply bg-gray-50;
+}
+
+/* Modal overlay */
+.modal-overlay {
+  @apply fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity z-40;
+}
+
+.modal-content {
+  @apply relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all;
+}
+
+/* Dropdown menu */
+.dropdown-menu {
+  @apply absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50;
+}
+
+.dropdown-item {
+  @apply block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer;
+}
+
+/* Notification styles */
+.notification {
+  @apply max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden;
+}
+
+.notification-success {
+  @apply border-l-4 border-success-500;
+}
+
+.notification-error {
+  @apply border-l-4 border-error-500;
+}
+
+.notification-warning {
+  @apply border-l-4 border-warning-500;
+}
+
+.notification-info {
+  @apply border-l-4 border-primary-500;
+}
+
+/* Progress bars */
+.progress-bar {
+  @apply w-full bg-gray-200 rounded-full h-2;
+}
+
+.progress-fill {
+  @apply h-2 rounded-full transition-all duration-300;
+}
+
+.progress-fill-primary {
+  @apply bg-primary-600;
+}
+
+.progress-fill-success {
+  @apply bg-success-600;
+}
+
+.progress-fill-warning {
+  @apply bg-warning-600;
+}
+
+.progress-fill-error {
+  @apply bg-error-600;
+}
+
+/* Badge styles */
+.badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.badge-primary {
+  @apply bg-primary-100 text-primary-800;
+}
+
+.badge-secondary {
+  @apply bg-gray-100 text-gray-800;
+}
+
+.badge-success {
+  @apply bg-success-100 text-success-800;
+}
+
+.badge-warning {
+  @apply bg-warning-100 text-warning-800;
+}
+
+.badge-error {
+  @apply bg-error-100 text-error-800;
+}
+
+/* Tab styles */
+.tab-list {
+  @apply flex space-x-8 border-b border-gray-200;
+}
+
+.tab-button {
+  @apply py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 focus:outline-none focus:text-gray-700 focus:border-gray-300;
+}
+
+.tab-button-active {
+  @apply border-primary-500 text-primary-600;
+}
+
+/* Form validation styles */
+.form-field-error {
+  @apply border-error-300 text-error-900 placeholder-error-300 focus:outline-none focus:ring-error-500 focus:border-error-500;
+}
+
+.form-field-success {
+  @apply border-success-300 text-success-900 placeholder-success-300 focus:outline-none focus:ring-success-500 focus:border-success-500;
+}
+
+/* Sidebar styles */
+.sidebar-nav-item {
+  @apply group flex items-center px-2 py-2 text-sm font-medium rounded-md;
+}
+
+.sidebar-nav-item-active {
+  @apply bg-primary-100 text-primary-700;
+}
+
+.sidebar-nav-item-inactive {
+  @apply text-gray-600 hover:bg-gray-50 hover:text-gray-900;
+}
+
+/* Header styles */
+.header-user-menu {
+  @apply origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none;
+}
+
+/* Status indicators */
+.status-dot {
+  @apply flex-shrink-0 w-2.5 h-2.5 rounded-full;
+}
+
+.status-dot-online {
+  @apply bg-success-400;
+}
+
+.status-dot-offline {
+  @apply bg-gray-400;
+}
+
+.status-dot-error {
+  @apply bg-error-400;
+}
+
+.status-dot-warning {
+  @apply bg-warning-400;
+}
+
+/* Card hover effects */
+.card-hover {
+  @apply transition-shadow duration-200 hover:shadow-medium;
+}
+
+.card-interactive {
+  @apply cursor-pointer transition-all duration-200 hover:shadow-medium hover:-translate-y-1;
+}
+
+/* Empty states */
+.empty-state {
+  @apply text-center py-12;
+}
+
+.empty-state-icon {
+  @apply mx-auto h-12 w-12 text-gray-400 mb-4;
+}
+
+.empty-state-title {
+  @apply text-lg font-medium text-gray-900 mb-2;
+}
+
+.empty-state-description {
+  @apply text-gray-500 mb-6;
+}
+
+/* Responsive utilities */
+@media (max-width: 640px) {
+  .mobile-stack {
+    @apply flex-col space-y-2 space-x-0;
+  }
+
+  .mobile-full-width {
+    @apply w-full;
+  }
+
+  .mobile-text-center {
+    @apply text-center;
+  }
+}
+
+/* Focus visible for accessibility */
+.focus-visible:focus-visible {
+  @apply outline-none ring-2 ring-primary-500 ring-offset-2;
+}
+
+/* High contrast mode adjustments */
+@media (prefers-contrast: high) {
+  .high-contrast-border {
+    @apply border-2 border-gray-900;
+  }
+
+  .high-contrast-text {
+    @apply text-gray-900;
+  }
+}
