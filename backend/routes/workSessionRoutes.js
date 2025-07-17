@@ -11,18 +11,23 @@ const publicRouter = express.Router()
 publicRouter.get('/download/rdp/:token', async (req, res) => {
   try {
     const { token } = req.params
+    console.log('[RDP Download] Attempting to download RDP file with token:', token)
     
     const result = await pool.query(`
       SELECT content FROM temp_connections 
       WHERE token = $1 AND expires_at > NOW()
     `, [token])
 
+    console.log('[RDP Download] Database query result:', result.rows.length, 'rows found')
+
     if (result.rows.length === 0) {
+      console.log('[RDP Download] ❌ RDP file not found or expired for token:', token)
       return res.status(404).json({ error: 'RDP file not found or expired' })
     }
 
     // Decode base64 content back to binary
     const binaryContent = Buffer.from(result.rows[0].content, 'base64')
+    console.log('[RDP Download] ✅ RDP file found, sending binary content, size:', binaryContent.length, 'bytes')
 
     res.setHeader('Content-Type', 'application/x-rdp')
     res.setHeader('Content-Disposition', `attachment; filename="vm-connection.rdp"`)
@@ -31,7 +36,7 @@ publicRouter.get('/download/rdp/:token', async (req, res) => {
     res.send(binaryContent)
 
   } catch (error) {
-    console.error('Error downloading RDP file:', error)
+    console.error('[RDP Download] ❌ Error downloading RDP file:', error)
     res.status(500).json({ error: 'Failed to download RDP file' })
   }
 })
@@ -698,13 +703,15 @@ authenticatedRouter.post('/non-work-log', async (req, res) => {
 // Helper functions for generating connection files
 async function generateAzureRDPFile(vm, userId, sessionId) {
   const tempToken = crypto.randomBytes(32).toString('hex')
+  console.log('[RDP Generation] Generating RDP file for VM:', vm.id, 'User:', userId, 'Token:', tempToken)
 
   // Always fetch credentials using CredentialService
   let credentials
   try {
     credentials = await CredentialService.getConnectionCredentials(vm.id, userId)
+    console.log('[RDP Generation] ✅ Credentials found for VM:', vm.id)
   } catch (err) {
-    console.warn(`[RDP] No credentials found for VM ${vm.id}, creating default credentials. Admin should update these!`)
+    console.warn(`[RDP Generation] ⚠️ No credentials found for VM ${vm.id}, creating default credentials. Admin should update these!`)
     await CredentialService.setVMCredentials(vm.id, {
       username: 'defaultuser',
       password: 'changeme123!',
@@ -712,6 +719,7 @@ async function generateAzureRDPFile(vm, userId, sessionId) {
       connectionPort: 3389
     })
     credentials = await CredentialService.getConnectionCredentials(vm.id, userId)
+    console.log('[RDP Generation] ✅ Default credentials created for VM:', vm.id)
   }
 
   // Add BOM and use exact Windows 11 RDP format
@@ -778,11 +786,13 @@ async function generateAzureRDPFile(vm, userId, sessionId) {
   const base64Content = fullContent.toString('base64')
 
   // Store base64 encoded content
+  console.log('[RDP Generation] Storing RDP file in database with token:', tempToken)
   await pool.query(`
     INSERT INTO temp_connections (token, vm_id, user_id, session_id, content, expires_at)
     VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '30 minutes')
   `, [tempToken, vm.id, userId, sessionId, base64Content])
 
+  console.log('[RDP Generation] ✅ RDP file stored successfully, returning download URL')
   return `/api/work-sessions/download/rdp/${tempToken}`
 }
 
