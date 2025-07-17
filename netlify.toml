@@ -1,0 +1,16 @@
+[build]
+  base = "frontend/"
+  publish = "frontend/dist"
+  command = "npm install && npm run build"
+
+[build.environment]
+  NODE_VERSION = "18"
+  VITE_API_BASE_URL = "https://your-backend-app.cyclic.app/api"
+  VITE_AZURE_CLIENT_ID = "your-azure-client-id"
+  VITE_AZURE_TENANT_ID = "your-azure-tenant-id"
+  VITE_AZURE_REDIRECT_URI = "https://your-app.netlify.app"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

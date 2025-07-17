@@ -34,7 +34,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          charts: ['chart.js', 'react-chartjs-2'],
+          charts: ['recharts'],
           azure: ['@azure/msal-browser', '@azure/msal-react'],
           ui: ['lucide-react', 'react-hot-toast']
         }
