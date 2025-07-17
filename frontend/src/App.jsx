@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { MsalProvider } from '@azure/msal-react'
 import { PublicClientApplication } from '@azure/msal-browser'
@@ -7,6 +7,7 @@ import { msalConfig } from './config/authConfig'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { NotificationProvider } from './contexts/NotificationContext'
+import axios from 'axios'
 
 // Pages
 import RoleSelection from './pages/RoleSelection'
@@ -36,6 +37,22 @@ const queryClient = new QueryClient({
 })
 
 function App() {
+  // Wake up backend on app start
+  useEffect(() => {
+    const wakeUpBackend = async () => {
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api'
+        console.log('Waking up backend on app start...')
+        await axios.get(`${API_BASE_URL}/health`, { timeout: 30000 })
+        console.log('Backend is ready!')
+      } catch (error) {
+        console.warn('Backend wake-up failed on app start:', error.message)
+      }
+    }
+    
+    wakeUpBackend()
+  }, [])
+
   return (
     <QueryClientProvider client={queryClient}>
       <MsalProvider instance={msalInstance}>

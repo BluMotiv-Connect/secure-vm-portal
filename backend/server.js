@@ -16,7 +16,7 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
   process.env.FRONTEND_URL,
-  'https://secure-vm-portal-frontend.onrender.com' // Add your Render frontend URL
+  'https://secure-vm-portal-frontend.onrender.com' // Your actual Render frontend URL
 ].filter(Boolean)
 
 app.use(cors({
@@ -33,10 +33,33 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['X-Total-Count'],
-  optionsSuccessStatus: 200
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With', 
+    'Origin', 
+    'Accept',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
+  exposedHeaders: ['X-Total-Count', 'Access-Control-Allow-Origin'],
+  optionsSuccessStatus: 200,
+  maxAge: 86400, // 24 hours
+  preflightContinue: false
 }))
+
+// Additional CORS handling for preflight requests
+app.options('*', (req, res) => {
+  const origin = req.headers.origin
+  if (!origin || allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin || '*')
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH')
+    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Origin,Accept')
+    res.header('Access-Control-Allow-Credentials', 'true')
+    res.header('Access-Control-Max-Age', '86400')
+  }
+  res.sendStatus(200)
+})
 
 // Rate limiting - More lenient for development
 const limiter = rateLimit({
