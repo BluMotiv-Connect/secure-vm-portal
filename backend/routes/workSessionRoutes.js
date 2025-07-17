@@ -7,11 +7,21 @@ const CredentialService = require('../src/services/credentialService')
 const authenticatedRouter = express.Router()
 const publicRouter = express.Router()
 
+// Test endpoint to check if public router is working
+publicRouter.get('/test-public', (req, res) => {
+  console.log('[Test Public] Public router is working!')
+  res.json({ message: 'Public router is working!', timestamp: new Date().toISOString() })
+})
+
 // Download RDP file endpoint (public with token validation)
 publicRouter.get('/download/rdp/:token', async (req, res) => {
   try {
     const { token } = req.params
+    console.log('[RDP Download] ==========================================')
     console.log('[RDP Download] Attempting to download RDP file with token:', token)
+    console.log('[RDP Download] Request URL:', req.originalUrl)
+    console.log('[RDP Download] Request method:', req.method)
+    console.log('[RDP Download] ==========================================')
     
     const result = await pool.query(`
       SELECT content FROM temp_connections 
@@ -22,6 +32,19 @@ publicRouter.get('/download/rdp/:token', async (req, res) => {
 
     if (result.rows.length === 0) {
       console.log('[RDP Download] ❌ RDP file not found or expired for token:', token)
+      
+      // Let's also check if the token exists but is expired
+      const expiredCheck = await pool.query(`
+        SELECT token, expires_at, created_at FROM temp_connections 
+        WHERE token = $1
+      `, [token])
+      
+      if (expiredCheck.rows.length > 0) {
+        console.log('[RDP Download] Token found but expired:', expiredCheck.rows[0])
+      } else {
+        console.log('[RDP Download] Token not found in database at all')
+      }
+      
       return res.status(404).json({ error: 'RDP file not found or expired' })
     }
 
