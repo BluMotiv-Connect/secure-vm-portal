@@ -55,12 +55,26 @@ const VMSelector = ({ task, onWorkStart, onClose }) => {
             <p class="text-sm text-blue-800">${instructions}</p>
           </div>
           <div class="flex space-x-3">
-            <button onclick="window.open('${connectionUrl}', '_blank', 'width=1400,height=900'); document.body.removeChild(this.closest('.fixed'));" 
+            <button onclick="
+              if ('${connectionUrl}'.includes('/download/rdp/')) {
+                // For RDP files, trigger download
+                const link = document.createElement('a');
+                link.href = '${connectionUrl}';
+                link.download = 'vm-connection.rdp';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              } else {
+                // For other connections, open in new window
+                window.open('${connectionUrl}', '_blank', 'width=1400,height=900');
+              }
+              document.body.removeChild(this.closest('.fixed'));
+            " 
                     class="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center justify-center">
               <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
               </svg>
-              Open ${vmName}
+              ${connectionUrl.includes('/download/rdp/') ? 'Download RDP File' : 'Open ' + vmName}
             </button>
             <button onclick="document.body.removeChild(this.closest('.fixed'));" 
                     class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">
