@@ -95,18 +95,22 @@ app.get('/api/health', (req, res) => {
 // Auth routes (no auth required)
 app.use('/api/auth', require('./routes/authRoutes'))
 
-// Work session public routes (no auth required - token-based validation)
+// Work session routes - public routes first, then authenticated routes
 const { authenticatedRouter: workSessionAuth, publicRouter: workSessionPublic } = require('./routes/workSessionRoutes')
+
+// Mount public routes first (these don't require auth)
 app.use('/api/work-sessions', workSessionPublic)
 
-// Protected routes (auth required)
+// Mount authenticated routes second (these require auth)
+app.use('/api/work-sessions', authenticateToken, workSessionAuth)
+
+// Other protected routes (auth required)
 app.use('/api/users', authenticateToken, require('./routes/userRoutes'))
 app.use('/api/vms', authenticateToken, require('./routes/vmRoutes'))
 app.use('/api/projects', authenticateToken, require('./routes/projectRoutes'))
 app.use('/api/admin/projects', authenticateToken, require('./routes/adminProjectRoutes'))
 app.use('/api/admin/tasks', authenticateToken, require('./routes/adminTaskRoutes'))
 app.use('/api/tasks', authenticateToken, require('./routes/taskRoutes'))
-app.use('/api/work-sessions', authenticateToken, workSessionAuth)
 app.use('/api/employee/dashboard', authenticateToken, require('./routes/employeeDashboardRoutes'))
 
 // 404 handler
