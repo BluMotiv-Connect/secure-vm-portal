@@ -9,12 +9,24 @@ const ActiveSession = ({ session, onEnd }) => {
   useEffect(() => {
     if (!session) return
 
+    console.log('[ActiveSession] Session data:', session)
+    console.log('[ActiveSession] Start time:', session.start_time)
+    
     const startTime = new Date(session.start_time)
+    console.log('[ActiveSession] Parsed start time:', startTime)
+    
+    // Validate the start time
+    if (isNaN(startTime.getTime())) {
+      console.error('[ActiveSession] Invalid start time:', session.start_time)
+      setElapsedTime(0)
+      return
+    }
     
     const timer = setInterval(() => {
       const now = new Date()
       const elapsed = Math.floor((now - startTime) / 1000)
-      setElapsedTime(elapsed)
+      console.log('[ActiveSession] Elapsed seconds:', elapsed)
+      setElapsedTime(Math.max(0, elapsed)) // Ensure non-negative
     }, 1000)
 
     return () => clearInterval(timer)
