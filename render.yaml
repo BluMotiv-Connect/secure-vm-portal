@@ -3,7 +3,7 @@ services:
   - type: web
     name: secure-vm-portal-backend
     env: node
-    plan: starter
+    plan: free
     buildCommand: cd backend && npm install
     startCommand: cd backend && npm start
     envVars:
@@ -31,7 +31,7 @@ services:
   - type: web
     name: secure-vm-portal-frontend
     env: static
-    plan: starter
+    plan: free
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: frontend/dist
     envVars:
