@@ -57,13 +57,29 @@ const VMSelector = ({ task, onWorkStart, onClose }) => {
           <div class="flex space-x-3">
             <button onclick="
               if ('${connectionUrl}'.includes('/download/rdp/')) {
-                // For RDP files, trigger download
-                const link = document.createElement('a');
-                link.href = '${connectionUrl}';
-                link.download = 'vm-connection.rdp';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                // For RDP files, use fetch to download with proper error handling
+                fetch('${connectionUrl}')
+                  .then(response => {
+                    if (!response.ok) {
+                      throw new Error('Download failed: ' + response.status);
+                    }
+                    return response.blob();
+                  })
+                  .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'vm-connection.rdp';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                    console.log('RDP file downloaded successfully');
+                  })
+                  .catch(error => {
+                    console.error('RDP download failed:', error);
+                    alert('Failed to download RDP file. Please try starting the work session again.');
+                  });
               } else {
                 // For other connections, open in new window
                 window.open('${connectionUrl}', '_blank', 'width=1400,height=900');

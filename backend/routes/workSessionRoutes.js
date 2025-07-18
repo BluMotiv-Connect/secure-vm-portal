@@ -21,10 +21,16 @@ publicRouter.get('/download/rdp/:token', async (req, res) => {
     console.log('[RDP Download] Attempting to download RDP file with token:', token)
     console.log('[RDP Download] Request URL:', req.originalUrl)
     console.log('[RDP Download] Request method:', req.method)
+    console.log('[RDP Download] User Agent:', req.headers['user-agent'])
     console.log('[RDP Download] ==========================================')
     
+    // Set CORS headers for the download
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'GET')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    
     const result = await pool.query(`
-      SELECT content FROM temp_connections 
+      SELECT content, vm_id FROM temp_connections 
       WHERE token = $1 AND expires_at > NOW()
     `, [token])
 
@@ -41,11 +47,11 @@ publicRouter.get('/download/rdp/:token', async (req, res) => {
       
       if (expiredCheck.rows.length > 0) {
         console.log('[RDP Download] Token found but expired:', expiredCheck.rows[0])
+        return res.status(410).send('RDP file has expired. Please start a new work session.')
       } else {
         console.log('[RDP Download] Token not found in database at all')
+        return res.status(404).send('RDP file not found. Please start a new work session.')
       }
-      
-      return res.status(404).json({ error: 'RDP file not found or expired' })
     }
 
     // Decode base64 content back to text
@@ -53,16 +59,20 @@ publicRouter.get('/download/rdp/:token', async (req, res) => {
     console.log('[RDP Download] ✅ RDP file found, sending content, size:', rdpContent.length, 'characters')
     console.log('[RDP Download] Content preview:', rdpContent.substring(0, 100) + '...')
 
+    // Set proper headers for RDP file download
     res.setHeader('Content-Type', 'application/x-rdp')
     res.setHeader('Content-Disposition', `attachment; filename="vm-connection.rdp"`)
     res.setHeader('Content-Length', Buffer.byteLength(rdpContent, 'utf8'))
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+    res.setHeader('Pragma', 'no-cache')
+    res.setHeader('Expires', '0')
     
     // Send as plain text
     res.send(rdpContent)
 
   } catch (error) {
     console.error('[RDP Download] ❌ Error downloading RDP file:', error)
-    res.status(500).json({ error: 'Failed to download RDP file' })
+    res.status(500).send('Failed to download RDP file. Please try again.')
   }
 })
 
