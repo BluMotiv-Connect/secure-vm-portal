@@ -48,15 +48,17 @@ publicRouter.get('/download/rdp/:token', async (req, res) => {
       return res.status(404).json({ error: 'RDP file not found or expired' })
     }
 
-    // Decode base64 content back to binary
-    const binaryContent = Buffer.from(result.rows[0].content, 'base64')
-    console.log('[RDP Download] ✅ RDP file found, sending binary content, size:', binaryContent.length, 'bytes')
+    // Decode base64 content back to text
+    const rdpContent = Buffer.from(result.rows[0].content, 'base64').toString('utf8')
+    console.log('[RDP Download] ✅ RDP file found, sending content, size:', rdpContent.length, 'characters')
+    console.log('[RDP Download] Content preview:', rdpContent.substring(0, 100) + '...')
 
     res.setHeader('Content-Type', 'application/x-rdp')
     res.setHeader('Content-Disposition', `attachment; filename="vm-connection.rdp"`)
+    res.setHeader('Content-Length', Buffer.byteLength(rdpContent, 'utf8'))
     
-    // Send binary content
-    res.send(binaryContent)
+    // Send as plain text
+    res.send(rdpContent)
 
   } catch (error) {
     console.error('[RDP Download] ❌ Error downloading RDP file:', error)
@@ -745,9 +747,8 @@ async function generateAzureRDPFile(vm, userId, sessionId) {
     console.log('[RDP Generation] ✅ Default credentials created for VM:', vm.id)
   }
 
-  // Add BOM and use exact Windows 11 RDP format
-  const bom = Buffer.from([0xFF, 0xFE])
-  const settings = [
+  // Create a simple, standard RDP file content (no BOM, plain text)
+  const rdpContent = [
     'screen mode id:i:2',
     'use multimon:i:0',
     'desktopwidth:i:1920',
@@ -763,7 +764,6 @@ async function generateAzureRDPFile(vm, userId, sessionId) {
     'bandwidthautodetect:i:1',
     'displayconnectionbar:i:1',
     'enableworkspacereconnect:i:0',
-    'remoteappmousemoveinject:i:1',
     'disable wallpaper:i:0',
     'allow font smoothing:i:0',
     'allow desktop composition:i:0',
@@ -797,22 +797,19 @@ async function generateAzureRDPFile(vm, userId, sessionId) {
     'use redirection server name:i:0',
     'rdgiskdcproxy:i:0',
     'kdcproxyname:s:',
-    'enablerdsaadauth:i:0',
-    ''  // Empty line at the end
-  ]
+    'enablerdsaadauth:i:0'
+  ].join('\r\n')
 
-  // Convert settings to UTF-16LE and combine with BOM
-  const contentBuffer = Buffer.from(settings.join('\r\n'), 'utf16le')
-  const fullContent = Buffer.concat([bom, contentBuffer])
-  
-  // Convert to base64 for storage
-  const base64Content = fullContent.toString('base64')
+  // Convert to base64 for storage (simple text, no BOM)
+  const base64Content = Buffer.from(rdpContent, 'utf8').toString('base64')
 
   // Store base64 encoded content
   console.log('[RDP Generation] Storing RDP file in database with token:', tempToken)
+  console.log('[RDP Generation] RDP content preview:', rdpContent.substring(0, 200) + '...')
+  
   await pool.query(`
     INSERT INTO temp_connections (token, vm_id, user_id, session_id, content, expires_at)
-    VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '30 minutes')
+    VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '2 hours')
   `, [tempToken, vm.id, userId, sessionId, base64Content])
 
   console.log('[RDP Generation] ✅ RDP file stored successfully, returning download URL')
