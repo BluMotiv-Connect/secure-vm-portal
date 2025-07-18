@@ -92,6 +92,11 @@ app.get('/api/health', (req, res) => {
   })
 })
 
+// Favicon endpoint to prevent browser warnings
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end() // No content response
+})
+
 // Auth routes (no auth required)
 app.use('/api/auth', require('./routes/authRoutes'))
 
