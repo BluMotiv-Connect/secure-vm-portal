@@ -82,10 +82,24 @@ router.post('/login', async (req, res) => {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role
+        role: user.role,
+        iat: Math.floor(Date.now() / 1000),
+        iss: 'secure-vm-portal'
       },
       process.env.JWT_SECRET,
-      { expiresIn: '8h' }
+      { expiresIn: '2h' } // Shorter expiration for better security
+    )
+    
+    // Generate refresh token
+    const refreshToken = jwt.sign(
+      {
+        id: user.id,
+        type: 'refresh',
+        iat: Math.floor(Date.now() / 1000),
+        iss: 'secure-vm-portal'
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
     )
 
     const responseUser = {
@@ -100,6 +114,7 @@ router.post('/login', async (req, res) => {
     res.json({
       success: true,
       token,
+      refreshToken,
       user: responseUser
     })
 
@@ -130,6 +145,115 @@ router.get('/validate', async (req, res) => {
   } catch (error) {
     res.status(401).json({
       error: 'Invalid token'
+    })
+  }
+})
+
+// Token refresh endpoint
+router.post('/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.body
+    
+    if (!refreshToken) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Refresh token is required',
+        message: 'Refresh token is required' 
+      })
+    }
+    
+    // Verify the refresh token
+    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET)
+    
+    // Check if it's a valid refresh token
+    if (!decoded || !decoded.id || decoded.type !== 'refresh') {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Invalid refresh token',
+        message: 'Invalid refresh token',
+        code: 'INVALID_REFRESH_TOKEN' 
+      })
+    }
+    
+    // Get user from database
+    const result = await pool.query(
+      'SELECT * FROM users WHERE id = $1 AND is_active = true',
+      [decoded.id]
+    )
+    
+    if (result.rows.length === 0) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'User not found',
+        message: 'User not found',
+        code: 'USER_NOT_FOUND' 
+      })
+    }
+    
+    const user = result.rows[0]
+    
+    // Generate new JWT token
+    const token = jwt.sign(
+      { 
+        id: user.id, 
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        iat: Math.floor(Date.now() / 1000),
+        iss: 'secure-vm-portal'
+      }, 
+      process.env.JWT_SECRET, 
+      { expiresIn: '2h' }
+    )
+    
+    // Generate new refresh token
+    const newRefreshToken = jwt.sign(
+      { 
+        id: user.id,
+        type: 'refresh',
+        iat: Math.floor(Date.now() / 1000),
+        iss: 'secure-vm-portal'
+      }, 
+      process.env.JWT_SECRET, 
+      { expiresIn: '7d' }
+    )
+    
+    console.log('[Token Refresh] ✅ Token refreshed successfully for user:', user.email)
+    
+    // Return new tokens
+    res.json({
+      success: true,
+      token,
+      refreshToken: newRefreshToken,
+      message: 'Token refreshed successfully'
+    })
+  } catch (error) {
+    console.error('[Token Refresh] ❌ Error:', error)
+    
+    // Check if token is expired
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Refresh token expired', 
+        message: 'Refresh token expired',
+        code: 'TOKEN_EXPIRED' 
+      })
+    }
+    
+    // Check if token is invalid
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Invalid refresh token', 
+        message: 'Invalid refresh token',
+        code: 'INVALID_TOKEN' 
+      })
+    }
+    
+    res.status(401).json({ 
+      success: false, 
+      error: 'Token refresh failed',
+      message: 'Token refresh failed' 
     })
   }
 })

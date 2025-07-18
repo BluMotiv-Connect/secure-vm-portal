@@ -39,12 +39,31 @@ const authenticateToken = async (req, res, next) => {
     next()
   } catch (error) {
     console.error('[Auth Middleware] ❌ Token validation failed:', error.message)
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(403).json({ error: 'Invalid token' })
-    } else if (error.name === 'TokenExpiredError') {
-      return res.status(403).json({ error: 'Token expired' })
+    
+    if (error.name === 'TokenExpiredError') {
+      console.log('[Auth Middleware] ❌ Token expired')
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Token expired', 
+        message: 'Token expired',
+        code: 'TOKEN_EXPIRED' 
+      })
+    } else if (error.name === 'JsonWebTokenError') {
+      console.log('[Auth Middleware] ❌ Invalid token:', error.message)
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Invalid token',
+        message: 'Invalid token', 
+        code: 'INVALID_TOKEN' 
+      })
     } else {
-      return res.status(403).json({ error: 'Token validation failed' })
+      console.log('[Auth Middleware] ❌ Token verification error:', error.message)
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Authentication failed',
+        message: 'Authentication failed', 
+        code: 'AUTH_FAILED' 
+      })
     }
   }
 }

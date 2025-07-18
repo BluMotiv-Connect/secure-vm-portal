@@ -26,50 +26,48 @@ function onRefreshed(token) {
 async function refreshToken() {
   try {
     const refreshToken = localStorage.getItem('refreshToken')
-    if (!refreshToken) throw new Error('No refresh token available')
+    if (!refreshToken) {
+      console.warn('No refresh token available, redirecting to login')
+      throw new Error('No refresh token available')
+    }
     
-    const response = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken }, { withCredentials: true })
-    const { token } = response.data
+    console.log('Attempting to refresh token...')
+    const response = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken }, { 
+      withCredentials: true,
+      timeout: 10000 // 10 second timeout for refresh
+    })
     
-    if (token) {
+    if (response.data.success && response.data.token) {
+      const { token, refreshToken: newRefreshToken } = response.data
       localStorage.setItem('authToken', token)
+      if (newRefreshToken) {
+        localStorage.setItem('refreshToken', newRefreshToken)
+      }
+      console.log('Token refreshed successfully')
       return token
     } else {
-      throw new Error('Failed to refresh token')
+      throw new Error('Invalid refresh response')
     }
   } catch (error) {
-    console.error('Token refresh failed:', error)
+    console.error('Token refresh failed:', error.response?.data || error.message)
     
-    // If refresh fails, try to re-authenticate with Azure AD
-    try {
-      console.log('Attempting to re-authenticate with Azure AD...')
-      // This will trigger the Azure AD login flow
-      window.dispatchEvent(new CustomEvent('auth:refresh-needed'))
-      
-      // Return a promise that will be resolved when authentication completes
-      return new Promise((resolve, reject) => {
-        const authCheckInterval = setInterval(() => {
-          const newToken = localStorage.getItem('authToken')
-          if (newToken) {
-            clearInterval(authCheckInterval)
-            resolve(newToken)
-          }
-        }, 1000)
-        
-        // Timeout after 30 seconds
-        setTimeout(() => {
-          clearInterval(authCheckInterval)
-          reject(new Error('Re-authentication timeout'))
-        }, 30000)
-      })
-    } catch (reAuthError) {
-      console.error('Re-authentication failed:', reAuthError)
+    // If refresh token is expired or invalid, clear everything and redirect
+    if (error.response?.status === 401 || error.response?.data?.code === 'TOKEN_EXPIRED') {
+      console.warn('Refresh token expired, clearing auth and redirecting to login')
       localStorage.removeItem('authToken')
       localStorage.removeItem('refreshToken')
       localStorage.removeItem('user')
       window.location.href = '/login'
-      throw reAuthError
+      throw new Error('Refresh token expired')
     }
+    
+    // For other errors, still clear auth and redirect
+    console.error('Refresh failed, clearing auth and redirecting to login')
+    localStorage.removeItem('authToken')
+    localStorage.removeItem('refreshToken')
+    localStorage.removeItem('user')
+    window.location.href = '/login'
+    throw error
   }
 }
 
@@ -142,42 +140,54 @@ apiClient.interceptors.response.use(
       })
     }
 
-    // Handle authentication errors (JWT token expired)
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      console.warn('JWT token expired, attempting to refresh...')
+    // Handle authentication errors (JWT token expired or forbidden)
+    if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
+      const errorData = error.response?.data
       
-      if (isRefreshing) {
-        // Queue requests while refreshing
-        return new Promise((resolve, reject) => {
-          subscribeTokenRefresh(token => {
-            originalRequest.headers.Authorization = `Bearer ${token}`
-            resolve(apiClient(originalRequest))
+      // Check if it's specifically a token expiration issue
+      if (errorData?.error === 'Token expired' || errorData?.code === 'TOKEN_EXPIRED' || 
+          errorData?.message === 'Token expired' || error.response?.status === 401) {
+        
+        console.warn('JWT token expired, attempting to refresh...')
+        
+        if (isRefreshing) {
+          // Queue requests while refreshing
+          return new Promise((resolve, reject) => {
+            subscribeTokenRefresh((token) => {
+              if (token) {
+                originalRequest.headers.Authorization = `Bearer ${token}`
+                resolve(apiClient(originalRequest))
+              } else {
+                reject(new Error('Token refresh failed'))
+              }
+            })
           })
-        })
-      }
-      
-      originalRequest._retry = true
-      isRefreshing = true
-      
-      try {
-        // Try to get a fresh token from Azure AD
-        const newToken = await refreshToken()
-        isRefreshing = false
-        onRefreshed(newToken)
-        originalRequest.headers.Authorization = `Bearer ${newToken}`
-        return apiClient(originalRequest)
-      } catch (err) {
-        isRefreshing = false
-        console.error('Token refresh failed, redirecting to login...')
+        }
         
-        // Clear stored tokens and redirect to login
-        localStorage.removeItem('authToken')
-        localStorage.removeItem('refreshToken')
-        localStorage.removeItem('user')
+        originalRequest._retry = true
+        isRefreshing = true
         
-        // Redirect to login page
-        window.location.href = '/login'
-        return Promise.reject(err)
+        try {
+          // Try to refresh the token
+          const newToken = await refreshToken()
+          isRefreshing = false
+          onRefreshed(newToken)
+          originalRequest.headers.Authorization = `Bearer ${newToken}`
+          return apiClient(originalRequest)
+        } catch (refreshError) {
+          isRefreshing = false
+          onRefreshed(null) // Notify waiting requests that refresh failed
+          console.error('Token refresh failed, redirecting to login...')
+          
+          // Clear stored tokens and redirect to login
+          localStorage.removeItem('authToken')
+          localStorage.removeItem('refreshToken')
+          localStorage.removeItem('user')
+          
+          // Redirect to login page
+          window.location.href = '/login'
+          return Promise.reject(refreshError)
+        }
       }
     }
 
