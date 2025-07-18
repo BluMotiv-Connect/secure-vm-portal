@@ -823,7 +823,13 @@ async function generateAzureRDPFile(vm, userId, sessionId) {
   `, [tempToken, vm.id, userId, sessionId, base64Content])
 
   console.log('[RDP Generation] ✅ RDP file stored successfully, returning download URL')
-  return `/api/work-sessions/download/rdp/${tempToken}`
+  
+  // Return full backend URL for RDP download
+  const backendUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3001'
+  const downloadUrl = `${backendUrl}/api/work-sessions/download/rdp/${tempToken}`
+  console.log('[RDP Generation] Full download URL:', downloadUrl)
+  
+  return downloadUrl
 }
 
 async function generateDirectRDPFile(vm, userId, sessionId) {
