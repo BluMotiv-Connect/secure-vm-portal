@@ -165,7 +165,7 @@ router.get('/user/:userId', async (req, res) => {
         const tasksResult = await pool.query(`
           SELECT * FROM tasks 
           WHERE project_id = $1 
-          ORDER BY created_at DESC
+          ORDER BY created_at ASC
         `, [project.id])
         project.tasks = tasksResult.rows
       }
