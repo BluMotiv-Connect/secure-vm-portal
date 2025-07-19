@@ -283,8 +283,7 @@ router.post('/:id/assign', requireAdmin, async (req, res) => {
 
     const user = userCheck.rows[0]
 
-    // Remove existing assignment for this VM
-    await pool.query('DELETE FROM vm_assignments WHERE vm_id = $1', [id])
+    // Don't remove existing assignments - allow multiple users per VM
 
     // Create new assignment
     await pool.query(`
@@ -293,12 +292,24 @@ router.post('/:id/assign', requireAdmin, async (req, res) => {
       ON CONFLICT (vm_id, user_id) DO NOTHING
     `, [id, user_id, req.user.id])
 
-    // Update VM table with assignment info
-    await pool.query(`
-      UPDATE virtual_machines 
-      SET assigned_user_id = $1, assigned_user_name = $2, assigned_user_email = $3
-      WHERE id = $4
-    `, [user_id, user.name, user.email, id])
+    // Update VM table with primary assignment info (first assigned user for backward compatibility)
+    const primaryAssignment = await pool.query(`
+      SELECT u.id, u.name, u.email 
+      FROM vm_assignments va
+      JOIN users u ON va.user_id = u.id
+      WHERE va.vm_id = $1
+      ORDER BY va.assigned_at ASC
+      LIMIT 1
+    `, [id])
+
+    if (primaryAssignment.rows.length > 0) {
+      const primaryUser = primaryAssignment.rows[0]
+      await pool.query(`
+        UPDATE virtual_machines 
+        SET assigned_user_id = $1, assigned_user_name = $2, assigned_user_email = $3
+        WHERE id = $4
+      `, [primaryUser.id, primaryUser.name, primaryUser.email, id])
+    }
 
     console.log('[Assign VM] ✅ VM assigned successfully')
 
@@ -315,14 +326,69 @@ router.post('/:id/assign', requireAdmin, async (req, res) => {
   }
 })
 
-// Unassign VM
+// Unassign specific user from VM
+router.delete('/:id/assign/:userId', requireAdmin, async (req, res) => {
+  try {
+    const { id, userId } = req.params
+
+    console.log('[Unassign User] Removing user:', userId, 'from VM:', id)
+
+    // Remove specific user assignment
+    const result = await pool.query('DELETE FROM vm_assignments WHERE vm_id = $1 AND user_id = $2 RETURNING *', [id, userId])
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Assignment not found' })
+    }
+
+    // Update VM table with new primary assignment (if any users remain)
+    const remainingAssignments = await pool.query(`
+      SELECT u.id, u.name, u.email 
+      FROM vm_assignments va
+      JOIN users u ON va.user_id = u.id
+      WHERE va.vm_id = $1
+      ORDER BY va.assigned_at ASC
+      LIMIT 1
+    `, [id])
+
+    if (remainingAssignments.rows.length > 0) {
+      const primaryUser = remainingAssignments.rows[0]
+      await pool.query(`
+        UPDATE virtual_machines 
+        SET assigned_user_id = $1, assigned_user_name = $2, assigned_user_email = $3
+        WHERE id = $4
+      `, [primaryUser.id, primaryUser.name, primaryUser.email, id])
+    } else {
+      // No users left, clear assignment info
+      await pool.query(`
+        UPDATE virtual_machines 
+        SET assigned_user_id = NULL, assigned_user_name = NULL, assigned_user_email = NULL
+        WHERE id = $1
+      `, [id])
+    }
+
+    console.log('[Unassign User] ✅ User unassigned successfully')
+
+    res.json({
+      success: true,
+      message: 'User unassigned from VM successfully'
+    })
+  } catch (error) {
+    console.error('[Unassign User] ❌ Error:', error)
+    res.status(500).json({ 
+      error: 'Failed to unassign user from VM',
+      details: error.message 
+    })
+  }
+})
+
+// Unassign all users from VM
 router.delete('/:id/assign', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params
 
-    console.log('[Unassign VM] Unassigning VM:', id)
+    console.log('[Unassign All] Unassigning all users from VM:', id)
 
-    // Remove assignment
+    // Remove all assignments
     await pool.query('DELETE FROM vm_assignments WHERE vm_id = $1', [id])
 
     // Update VM table to remove assignment info
@@ -332,16 +398,55 @@ router.delete('/:id/assign', requireAdmin, async (req, res) => {
       WHERE id = $1
     `, [id])
 
-    console.log('[Unassign VM] ✅ VM unassigned successfully')
+    console.log('[Unassign All] ✅ All users unassigned successfully')
 
     res.json({
       success: true,
-      message: 'VM unassigned successfully'
+      message: 'All users unassigned from VM successfully'
     })
   } catch (error) {
-    console.error('[Unassign VM] ❌ Error:', error)
+    console.error('[Unassign All] ❌ Error:', error)
     res.status(500).json({ 
-      error: 'Failed to unassign VM',
+      error: 'Failed to unassign all users from VM',
+      details: error.message 
+    })
+  }
+})
+
+// Get all users assigned to a VM
+router.get('/:id/assignments', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    console.log('[Get VM Assignments] Fetching assignments for VM:', id)
+
+    const result = await pool.query(`
+      SELECT 
+        va.id as assignment_id,
+        va.assigned_at,
+        u.id as user_id,
+        u.name as user_name,
+        u.email as user_email,
+        u.role as user_role,
+        ab.name as assigned_by_name
+      FROM vm_assignments va
+      JOIN users u ON va.user_id = u.id
+      LEFT JOIN users ab ON va.assigned_by = ab.id
+      WHERE va.vm_id = $1
+      ORDER BY va.assigned_at ASC
+    `, [id])
+
+    console.log(`[Get VM Assignments] ✅ Found ${result.rows.length} assignments`)
+
+    res.json({
+      success: true,
+      assignments: result.rows,
+      total: result.rows.length
+    })
+  } catch (error) {
+    console.error('[Get VM Assignments] ❌ Error:', error)
+    res.status(500).json({ 
+      error: 'Failed to fetch VM assignments',
       details: error.message 
     })
   }

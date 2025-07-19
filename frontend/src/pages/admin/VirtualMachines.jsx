@@ -20,6 +20,7 @@ import {
   Globe
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import VMAssignmentManager from '../../components/admin/VMAssignmentManager'
 
 const VirtualMachines = () => {
   const { user: currentUser, logout } = useAuth()
@@ -33,6 +34,8 @@ const VirtualMachines = () => {
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [selectedVM, setSelectedVM] = useState(null)
   const [showPassword, setShowPassword] = useState({})
+  const [showAssignmentManager, setShowAssignmentManager] = useState(false)
+  const [vmForAssignment, setVmForAssignment] = useState(null)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -111,6 +114,20 @@ const VirtualMachines = () => {
       console.error('Unassign VM error:', error)
       setError(error.response?.data?.error || 'Failed to unassign VM')
     }
+  }
+
+  const handleOpenAssignmentManager = (vm) => {
+    setVmForAssignment(vm)
+    setShowAssignmentManager(true)
+  }
+
+  const handleCloseAssignmentManager = () => {
+    setShowAssignmentManager(false)
+    setVmForAssignment(null)
+  }
+
+  const handleAssignmentUpdate = () => {
+    fetchVMs() // Refresh the VM list to show updated assignments
   }
 
   const handleSubmit = async (e) => {

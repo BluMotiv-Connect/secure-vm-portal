@@ -84,8 +84,9 @@ authenticatedRouter.get('/assigned-vms', async (req, res) => {
     console.log('[Assigned VMs] Fetching VMs for user:', userId, req.user.email)
 
     const result = await pool.query(`
-      SELECT vm.* FROM virtual_machines vm
-      WHERE vm.assigned_user_id = $1 AND vm.status = 'online'
+      SELECT DISTINCT vm.* FROM virtual_machines vm
+      JOIN vm_assignments va ON vm.id = va.vm_id
+      WHERE va.user_id = $1 AND vm.status = 'online'
       ORDER BY vm.name
     `, [userId])
 
@@ -109,10 +110,11 @@ authenticatedRouter.post('/start-vm-session', async (req, res) => {
 
     console.log('[Start VM Session] Starting session for VM:', vm_id, 'User:', userId)
 
-    // Get VM details with cloud configuration
+    // Get VM details with cloud configuration - check via vm_assignments table
     const vmResult = await pool.query(`
-      SELECT * FROM virtual_machines 
-      WHERE id = $1 AND assigned_user_id = $2
+      SELECT vm.* FROM virtual_machines vm
+      JOIN vm_assignments va ON vm.id = va.vm_id
+      WHERE vm.id = $1 AND va.user_id = $2
     `, [vm_id, userId])
 
     if (vmResult.rows.length === 0) {
@@ -315,11 +317,12 @@ authenticatedRouter.post('/start', async (req, res) => {
       return res.status(400).json({ error: 'You already have an active work session' })
     }
 
-    // If VM session, verify VM is assigned to user
+    // If VM session, verify VM is assigned to user via vm_assignments table
     if (session_type === 'vm' && vm_id) {
       const vmCheck = await pool.query(`
-        SELECT * FROM virtual_machines 
-        WHERE id = $1 AND assigned_user_id = $2
+        SELECT vm.* FROM virtual_machines vm
+        JOIN vm_assignments va ON vm.id = va.vm_id
+        WHERE vm.id = $1 AND va.user_id = $2
       `, [vm_id, userId])
 
       if (vmCheck.rows.length === 0) {
