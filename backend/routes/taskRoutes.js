@@ -193,20 +193,39 @@ router.delete('/:id', async (req, res) => {
     const { id } = req.params
     const userId = req.user.id
 
+    console.log(`[Delete Task] Attempting to delete task ${id} for user ${userId}`)
+
     // Verify task belongs to user's project
     const taskCheck = await pool.query(`
-      SELECT t.id FROM tasks t
+      SELECT t.id, t.task_name, p.name as project_name FROM tasks t
       JOIN projects p ON t.project_id = p.id
       WHERE t.id = $1 AND p.user_id = $2
     `, [id, userId])
 
     if (taskCheck.rows.length === 0) {
+      console.log(`[Delete Task] ❌ Task ${id} not found or doesn't belong to user ${userId}`)
       return res.status(404).json({ error: 'Task not found' })
+    }
+
+    const { task_name, project_name } = taskCheck.rows[0]
+    console.log(`[Delete Task] Found task "${task_name}" in project "${project_name}"`)
+
+    // Check for active work sessions on this task
+    const activeSessionsCheck = await pool.query(`
+      SELECT COUNT(*) as count FROM work_sessions 
+      WHERE task_id = $1 AND is_active = true AND end_time IS NULL
+    `, [id])
+
+    if (parseInt(activeSessionsCheck.rows[0].count) > 0) {
+      console.log(`[Delete Task] ❌ Cannot delete task "${task_name}" - has active work sessions`)
+      return res.status(400).json({ 
+        error: 'Cannot delete task with active work sessions. Please end the active session first.' 
+      })
     }
 
     const result = await pool.query('DELETE FROM tasks WHERE id = $1 RETURNING *', [id])
 
-    console.log('[Delete Task] ✅ Task deleted successfully')
+    console.log(`[Delete Task] ✅ Task "${task_name}" deleted successfully`)
 
     res.json({
       success: true,
@@ -214,7 +233,24 @@ router.delete('/:id', async (req, res) => {
     })
   } catch (error) {
     console.error('[Delete Task] ❌ Error:', error)
-    res.status(500).json({ error: 'Failed to delete task' })
+    console.error('[Delete Task] Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      constraint: error.constraint
+    })
+    
+    // Provide more specific error messages
+    if (error.code === '23503') {
+      res.status(400).json({ 
+        error: 'Cannot delete task due to existing dependencies. Please end any active work sessions first.' 
+      })
+    } else {
+      res.status(500).json({ 
+        error: 'Failed to delete task',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      })
+    }
   }
 })
 
