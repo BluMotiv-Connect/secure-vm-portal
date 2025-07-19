@@ -526,6 +526,50 @@ authenticatedRouter.get('/stats', async (req, res) => {
   }
 })
 
+// Admin: Get active sessions only
+authenticatedRouter.get('/admin/active', async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' })
+    }
+
+    console.log('[Admin Active Sessions] Fetching all active sessions')
+
+    const result = await pool.query(`
+      SELECT 
+        ws.*,
+        u.name as user_name,
+        u.email as user_email,
+        t.task_name,
+        p.name as project_name,
+        vm.name as vm_name,
+        vm.ip_address as vm_ip,
+        vm.os_type,
+        vm.cloud_provider,
+        EXTRACT(EPOCH FROM (NOW() - ws.start_time))/60 as duration_minutes_current
+      FROM work_sessions ws
+      JOIN users u ON ws.user_id = u.id
+      JOIN tasks t ON ws.task_id = t.id
+      JOIN projects p ON t.project_id = p.id
+      LEFT JOIN virtual_machines vm ON ws.vm_id = vm.id
+      WHERE ws.is_active = true AND ws.end_time IS NULL
+      ORDER BY ws.start_time DESC
+    `)
+
+    console.log(`[Admin Active Sessions] ✅ Found ${result.rows.length} active sessions`)
+
+    res.json({
+      success: true,
+      sessions: result.rows,
+      total: result.rows.length
+    })
+  } catch (error) {
+    console.error('[Admin Active Sessions] ❌ Error:', error)
+    res.status(500).json({ error: 'Failed to fetch active sessions' })
+  }
+})
+
 // Admin: Get all sessions
 authenticatedRouter.get('/admin/all', async (req, res) => {
   try {
@@ -700,6 +744,48 @@ authenticatedRouter.post('/admin/force-end/:sessionId', async (req, res) => {
   } catch (error) {
     console.error('[Force End Session] ❌ Error:', error)
     res.status(500).json({ error: 'Failed to force end session' })
+  }
+})
+
+// Bulk end sessions (admin only)
+authenticatedRouter.post('/admin/bulk-end', async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' })
+    }
+
+    const { sessionIds } = req.body
+
+    if (!sessionIds || !Array.isArray(sessionIds) || sessionIds.length === 0) {
+      return res.status(400).json({ error: 'Session IDs array is required' })
+    }
+
+    console.log('[Bulk End Sessions] Admin ending sessions:', sessionIds)
+
+    // Create placeholders for the IN clause
+    const placeholders = sessionIds.map((_, index) => `$${index + 1}`).join(',')
+    
+    const result = await pool.query(`
+      UPDATE work_sessions 
+      SET end_time = NOW(), 
+          duration_minutes = EXTRACT(EPOCH FROM (NOW() - start_time)) / 60,
+          is_active = false
+      WHERE id IN (${placeholders}) AND is_active = true
+      RETURNING *
+    `, sessionIds)
+
+    console.log(`[Bulk End Sessions] ✅ ${result.rows.length} sessions ended by admin`)
+
+    res.json({
+      success: true,
+      endedSessions: result.rows,
+      count: result.rows.length,
+      message: `${result.rows.length} sessions ended by administrator`
+    })
+  } catch (error) {
+    console.error('[Bulk End Sessions] ❌ Error:', error)
+    res.status(500).json({ error: 'Failed to bulk end sessions' })
   }
 })
 

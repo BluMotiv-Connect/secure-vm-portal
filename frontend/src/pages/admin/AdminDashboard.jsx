@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../services/apiClient'
-import { Shield, Users, Monitor, BarChart3, LogOut, FolderOpen } from 'lucide-react'
+import { Shield, Users, Monitor, BarChart3, LogOut, FolderOpen, Activity } from 'lucide-react'
+import ActiveSessionsManager from '../../components/admin/ActiveSessionsManager'
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth()
@@ -211,6 +212,11 @@ const AdminDashboard = () => {
                 <div className="text-sm text-gray-600">Total VMs</div>
               </div>
             </div>
+          </div>
+
+          {/* Active Sessions Management */}
+          <div className="mt-8">
+            <ActiveSessionsManager />
           </div>
         </div>
       </main>
