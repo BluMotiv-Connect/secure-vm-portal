@@ -111,23 +111,69 @@ router.delete('/:id', async (req, res) => {
     const { id } = req.params
     const userId = req.user.id
 
+    console.log(`[Delete Project] Attempting to delete project ${id} for user ${userId}`)
+
+    // First check if project exists and belongs to user
+    const projectCheck = await pool.query(`
+      SELECT id, name FROM projects 
+      WHERE id = $1 AND user_id = $2
+    `, [id, userId])
+
+    if (projectCheck.rows.length === 0) {
+      console.log(`[Delete Project] ❌ Project ${id} not found or doesn't belong to user ${userId}`)
+      return res.status(404).json({ error: 'Project not found' })
+    }
+
+    const projectName = projectCheck.rows[0].name
+    console.log(`[Delete Project] Found project "${projectName}", proceeding with deletion`)
+
+    // Check for active work sessions
+    const activeSessionsCheck = await pool.query(`
+      SELECT COUNT(*) as count FROM work_sessions ws
+      JOIN tasks t ON ws.task_id = t.id
+      WHERE t.project_id = $1 AND ws.is_active = true AND ws.end_time IS NULL
+    `, [id])
+
+    if (parseInt(activeSessionsCheck.rows[0].count) > 0) {
+      console.log(`[Delete Project] ❌ Cannot delete project "${projectName}" - has active work sessions`)
+      return res.status(400).json({ 
+        error: 'Cannot delete project with active work sessions. Please end all active sessions first.' 
+      })
+    }
+
+    // Proceed with deletion
     const result = await pool.query(`
       DELETE FROM projects 
       WHERE id = $1 AND user_id = $2
       RETURNING *
     `, [id, userId])
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Project not found' })
-    }
+    console.log(`[Delete Project] ✅ Project "${projectName}" deleted successfully`)
 
     res.json({
       success: true,
       message: 'Project deleted successfully'
     })
   } catch (error) {
-    console.error('Delete project error:', error)
-    res.status(500).json({ error: 'Failed to delete project' })
+    console.error('[Delete Project] ❌ Error:', error)
+    console.error('[Delete Project] Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      constraint: error.constraint
+    })
+    
+    // Provide more specific error messages
+    if (error.code === '23503') {
+      res.status(400).json({ 
+        error: 'Cannot delete project due to existing dependencies. Please delete related tasks and work sessions first.' 
+      })
+    } else {
+      res.status(500).json({ 
+        error: 'Failed to delete project',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      })
+    }
   }
 })
 
