@@ -947,11 +947,6 @@ const VirtualMachines = () => {
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-export default VirtualMachines
       {/* VM Assignment Manager Modal */}
       {showAssignmentManager && vmForAssignment && (
         <VMAssignmentManager
