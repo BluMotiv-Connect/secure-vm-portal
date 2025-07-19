@@ -117,6 +117,7 @@ app.use('/api/admin/projects', authenticateToken, require('./routes/adminProject
 app.use('/api/admin/tasks', authenticateToken, require('./routes/adminTaskRoutes'))
 app.use('/api/tasks', authenticateToken, require('./routes/taskRoutes'))
 app.use('/api/employee/dashboard', authenticateToken, require('./routes/employeeDashboardRoutes'))
+app.use('/api/reports', authenticateToken, require('./routes/reportRoutes'))
 
 // 404 handler
 app.use('*', (req, res) => {

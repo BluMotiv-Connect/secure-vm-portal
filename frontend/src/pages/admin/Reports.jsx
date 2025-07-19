@@ -245,8 +245,7 @@ const Reports = () => {
   }
 
   const calculateRealReportData = (users, vms, sessions, projects) => {
-    // Your existing calculateRealReportData function
-    // (keeping the same implementation as before)
+    // Enhanced calculateRealReportData function with multi-user VM support
     const employees = users.filter(user => user.role === 'employee' && user.is_active)
     
     const onlineVMs = vms.filter(vm => vm.status === 'online')
@@ -271,6 +270,13 @@ const Reports = () => {
         .filter(session => session.duration_minutes)
         .reduce((sum, session) => sum + parseFloat(session.duration_minutes || 0), 0) / 60
       
+      // Get VMs this user has accessed
+      const userVMs = [...new Set(userSessions.filter(s => s.vm_id).map(s => s.vm_id))]
+      const vmNames = userVMs.map(vmId => {
+        const vm = vms.find(v => v.id === vmId)
+        return vm ? vm.name : 'Unknown VM'
+      }).join(', ')
+      
       return {
         userName: user.name,
         email: user.email,
@@ -279,7 +285,9 @@ const Reports = () => {
         avgSessionDuration: userSessions.length > 0 ? 
           Math.round((totalHours / userSessions.length) * 100) / 100 : 0,
         lastActivity: userSessions.length > 0 ? 
-          new Date(Math.max(...userSessions.map(s => new Date(s.start_time)))).toLocaleDateString() : 'Never'
+          new Date(Math.max(...userSessions.map(s => new Date(s.start_time)))).toLocaleDateString() : 'Never',
+        vmsAccessed: userVMs.length,
+        vmNames: vmNames || 'None'
       }
     }).sort((a, b) => b.totalHours - a.totalHours)
 
@@ -290,6 +298,7 @@ const Reports = () => {
         .reduce((sum, session) => sum + parseFloat(session.duration_minutes || 0), 0) / 60
       
       const uniqueUsers = [...new Set(vmSessions.map(session => session.user_id))].length
+      const userNames = [...new Set(vmSessions.map(session => session.user_name))].filter(Boolean)
 
       return {
         vmName: vm.name,
@@ -298,8 +307,10 @@ const Reports = () => {
         totalHours: Math.round(totalHours * 100) / 100,
         sessions: vmSessions.length,
         uniqueUsers: uniqueUsers,
+        userNames: userNames.join(', ') || 'None',
         utilization: Math.round((totalHours / (24 * 30)) * 100 * 100) / 100,
-        status: vm.status
+        status: vm.status,
+        mostActiveUser: userNames.length > 0 ? userNames[0] : 'None'
       }
     }).sort((a, b) => b.totalHours - a.totalHours)
 
@@ -530,6 +541,8 @@ const Reports = () => {
                   <option value="user-activity">User Activity</option>
                   <option value="vm-usage">VM Usage</option>
                   <option value="individual-user">Individual User Report</option>
+                  <option value="vm-multi-user">Multi-User VM Analysis</option>
+                  <option value="vm-utilization">VM Utilization Report</option>
                 </select>
               </div>
 
