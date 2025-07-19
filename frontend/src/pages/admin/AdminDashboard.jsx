@@ -21,22 +21,43 @@ const AdminDashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const [usersResponse, vmsResponse] = await Promise.all([
+      const [usersResponse, vmsResponse, activeSessionsResponse] = await Promise.all([
         apiClient.get('/users'),
-        apiClient.get('/vms')
+        apiClient.get('/vms'),
+        apiClient.get('/work-sessions/admin/active')
       ])
 
       const users = usersResponse.data.users
       const vms = vmsResponse.data.vms
+      const activeSessions = activeSessionsResponse.data.sessions
 
       setStats({
         totalUsers: users.length,
         totalVMs: vms.length,
         activeVMs: vms.filter(vm => vm.status === 'online').length,
-        activeSessions: vms.reduce((sum, vm) => sum + (vm.active_sessions_count || 0), 0)
+        activeSessions: activeSessions.length
       })
     } catch (error) {
       console.error('Failed to fetch stats:', error)
+      // Fallback to basic stats if active sessions fetch fails
+      try {
+        const [usersResponse, vmsResponse] = await Promise.all([
+          apiClient.get('/users'),
+          apiClient.get('/vms')
+        ])
+
+        const users = usersResponse.data.users
+        const vms = vmsResponse.data.vms
+
+        setStats({
+          totalUsers: users.length,
+          totalVMs: vms.length,
+          activeVMs: vms.filter(vm => vm.status === 'online').length,
+          activeSessions: 0 // Default to 0 if we can't fetch active sessions
+        })
+      } catch (fallbackError) {
+        console.error('Failed to fetch fallback stats:', fallbackError)
+      }
     }
   }
 
@@ -73,7 +94,7 @@ const AdminDashboard = () => {
           </div>
 
           {/* Admin Features Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
             {/* User Management */}
             <div className="bg-white overflow-hidden shadow rounded-lg">
               <div className="p-6">
@@ -161,6 +182,40 @@ const AdminDashboard = () => {
               </div>
             </div>
 
+            {/* Active Sessions Management */}
+            <div className="bg-white overflow-hidden shadow rounded-lg border-l-4 border-red-500">
+              <div className="p-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <Activity className="h-8 w-8 text-red-600" />
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">
+                        Active Sessions
+                      </dt>
+                      <dd className="text-lg font-medium text-gray-900">
+                        Monitor and manage live sessions
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-red-50 px-6 py-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-red-600 font-medium">
+                    {stats.activeSessions} Active Now
+                  </span>
+                  <button 
+                    onClick={() => document.getElementById('active-sessions-section').scrollIntoView({ behavior: 'smooth' })}
+                    className="text-sm text-red-600 hover:text-red-700 font-medium"
+                  >
+                    View Sessions →
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* Reports */}
             <div className="bg-white overflow-hidden shadow rounded-lg">
               <div className="p-6">
@@ -215,7 +270,7 @@ const AdminDashboard = () => {
           </div>
 
           {/* Active Sessions Management */}
-          <div className="mt-8">
+          <div id="active-sessions-section" className="mt-8">
             <ActiveSessionsManager />
           </div>
         </div>
