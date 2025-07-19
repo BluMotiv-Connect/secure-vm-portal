@@ -813,6 +813,9 @@ const VirtualMachines = () => {
                         <div className="text-sm">
                           <div className="font-medium text-gray-900">{vm.assigned_user_name}</div>
                           <div className="text-gray-500">{vm.assigned_user_email}</div>
+                          <div className="text-xs text-blue-600 mt-1">
+                            + others (click Users icon to manage)
+                          </div>
                         </div>
                       ) : (
                         <span className="text-sm text-gray-500">Unassigned</span>
@@ -826,11 +829,18 @@ const VirtualMachines = () => {
                       >
                         <Edit className="h-4 w-4" />
                       </button>
+                      <button
+                        onClick={() => handleOpenAssignmentManager(vm)}
+                        className="text-blue-600 hover:text-blue-900"
+                        title="Manage VM Assignments"
+                      >
+                        <Users className="h-4 w-4" />
+                      </button>
                       {vm.assigned_user_name ? (
                         <button
                           onClick={() => handleUnassignVM(vm.id)}
                           className="text-orange-600 hover:text-orange-900"
-                          title="Unassign VM"
+                          title="Unassign All Users"
                         >
                           <UserMinus className="h-4 w-4" />
                         </button>
@@ -841,7 +851,7 @@ const VirtualMachines = () => {
                             setShowAssignModal(true)
                           }}
                           className="text-green-600 hover:text-green-900"
-                          title="Assign VM"
+                          title="Quick Assign VM"
                         >
                           <UserPlus className="h-4 w-4" />
                         </button>
@@ -936,6 +946,19 @@ const VirtualMachines = () => {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  )
+}
+
+export default VirtualMachines
+      {/* VM Assignment Manager Modal */}
+      {showAssignmentManager && vmForAssignment && (
+        <VMAssignmentManager
+          vm={vmForAssignment}
+          onClose={handleCloseAssignmentManager}
+          onUpdate={handleAssignmentUpdate}
+        />
       )}
     </div>
   )
