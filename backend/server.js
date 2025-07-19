@@ -119,6 +119,37 @@ app.use('/api/tasks', authenticateToken, require('./routes/taskRoutes'))
 app.use('/api/employee/dashboard', authenticateToken, require('./routes/employeeDashboardRoutes'))
 app.use('/api/reports', authenticateToken, require('./routes/reportRoutes'))
 
+// Health check endpoint (no auth required) - for cron jobs and monitoring
+app.get('/health', (req, res) => {
+  const healthCheck = {
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    message: 'Backend server is running',
+    environment: process.env.NODE_ENV || 'development',
+    version: '1.0.0'
+  }
+  
+  console.log(`[Health Check] ${new Date().toISOString()} - Server is alive`)
+  res.status(200).json(healthCheck)
+})
+
+// Alternative simple health check endpoint
+app.get('/ping', (req, res) => {
+  console.log(`[Ping] ${new Date().toISOString()} - Ping received`)
+  res.status(200).send('pong')
+})
+
+// Wake up endpoint specifically for cron jobs
+app.get('/wake', (req, res) => {
+  console.log(`[Wake Up] ${new Date().toISOString()} - Wake up call received`)
+  res.status(200).json({
+    message: 'Backend is awake!',
+    timestamp: new Date().toISOString(),
+    uptime: `${Math.floor(process.uptime())} seconds`
+  })
+})
+
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
