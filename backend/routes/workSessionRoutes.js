@@ -523,6 +523,103 @@ authenticatedRouter.post('/cleanup-all-active', async (req, res) => {
   }
 })
 
+// Debug project dependencies (admin only)
+authenticatedRouter.get('/debug/project-dependencies/:projectId', async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' })
+    }
+
+    const { projectId } = req.params
+
+    // Check all tables that might reference this project
+    const [
+      workSessions,
+      projectAssignments,
+      tasks,
+      tempConnections
+    ] = await Promise.all([
+      pool.query('SELECT COUNT(*) as count FROM work_sessions WHERE project_id = $1', [projectId]),
+      pool.query('SELECT COUNT(*) as count FROM project_assignments WHERE project_id = $1', [projectId]),
+      pool.query('SELECT COUNT(*) as count FROM tasks WHERE project_id = $1', [projectId]),
+      pool.query(`
+        SELECT COUNT(*) as count FROM temp_connections tc 
+        JOIN work_sessions ws ON tc.session_id = ws.id 
+        WHERE ws.project_id = $1
+      `, [projectId])
+    ])
+
+    const dependencies = {
+      workSessions: parseInt(workSessions.rows[0].count),
+      projectAssignments: parseInt(projectAssignments.rows[0].count),
+      tasks: parseInt(tasks.rows[0].count),
+      tempConnections: parseInt(tempConnections.rows[0].count)
+    }
+
+    console.log(`[Debug Project Dependencies] Project ${projectId}:`, dependencies)
+
+    res.json({
+      success: true,
+      projectId,
+      dependencies,
+      totalDependencies: Object.values(dependencies).reduce((sum, count) => sum + count, 0)
+    })
+  } catch (error) {
+    console.error('[Debug Project Dependencies] ❌ Error:', error)
+    res.status(500).json({ error: 'Failed to debug project dependencies' })
+  }
+})
+
+// Force cleanup project dependencies (admin only)
+authenticatedRouter.post('/cleanup-project-dependencies/:projectId', async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' })
+    }
+
+    const { projectId } = req.params
+
+    // Clean up all dependencies in the correct order
+    const cleanupResults = []
+
+    // 1. Clean up temp_connections first
+    const tempConnections = await pool.query(`
+      DELETE FROM temp_connections 
+      WHERE session_id IN (
+        SELECT id FROM work_sessions WHERE project_id = $1
+      )
+      RETURNING *
+    `, [projectId])
+    cleanupResults.push({ table: 'temp_connections', count: tempConnections.rows.length })
+
+    // 2. Clean up work_sessions
+    const workSessions = await pool.query(`
+      DELETE FROM work_sessions WHERE project_id = $1 RETURNING *
+    `, [projectId])
+    cleanupResults.push({ table: 'work_sessions', count: workSessions.rows.length })
+
+    // 3. Clean up project_assignments
+    const projectAssignments = await pool.query(`
+      DELETE FROM project_assignments WHERE project_id = $1 RETURNING *
+    `, [projectId])
+    cleanupResults.push({ table: 'project_assignments', count: projectAssignments.rows.length })
+
+    console.log(`[Cleanup Project Dependencies] Project ${projectId}:`, cleanupResults)
+
+    res.json({
+      success: true,
+      message: `Cleaned up all dependencies for project ${projectId}`,
+      projectId,
+      cleanupResults
+    })
+  } catch (error) {
+    console.error('[Cleanup Project Dependencies] ❌ Error:', error)
+    res.status(500).json({ error: 'Failed to cleanup project dependencies' })
+  }
+})
+
 // Get active session
 authenticatedRouter.get('/active', async (req, res) => {
   try {

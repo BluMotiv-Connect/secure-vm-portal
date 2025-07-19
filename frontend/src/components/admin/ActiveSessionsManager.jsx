@@ -155,6 +155,69 @@ Check console for session details.`)
     }
   }
 
+  const handleDebugProject = async () => {
+    const projectId = prompt('Enter Project ID to debug dependencies:')
+    if (!projectId) return
+
+    try {
+      const response = await apiClient.get(`/work-sessions/debug/project-dependencies/${projectId}`)
+      console.log('Project Dependencies Debug:', response.data)
+      
+      const { dependencies, totalDependencies } = response.data
+      
+      alert(`Project ${projectId} Dependencies:
+Work Sessions: ${dependencies.workSessions}
+Project Assignments: ${dependencies.projectAssignments}
+Tasks: ${dependencies.tasks}
+Temp Connections: ${dependencies.tempConnections}
+Total Dependencies: ${totalDependencies}
+
+Check console for detailed information.`)
+      
+      if (totalDependencies > 0) {
+        if (confirm(`Found ${totalDependencies} dependencies blocking deletion. Clean them up?`)) {
+          await handleCleanupProject(projectId)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to debug project dependencies:', err)
+      alert('Failed to debug project dependencies. Please try again.')
+    }
+  }
+
+  const handleCleanupProject = async (projectId) => {
+    if (!projectId) {
+      projectId = prompt('Enter Project ID to cleanup dependencies:')
+      if (!projectId) return
+    }
+
+    if (!confirm(`⚠️ WARNING: This will delete ALL dependencies for project ${projectId} including work sessions, assignments, and temp connections. This cannot be undone. Continue?`)) {
+      return
+    }
+
+    try {
+      setLoading(true)
+      const response = await apiClient.post(`/work-sessions/cleanup-project-dependencies/${projectId}`)
+      
+      console.log('Project Cleanup Results:', response.data)
+      
+      const { cleanupResults } = response.data
+      const summary = cleanupResults.map(r => `${r.table}: ${r.count}`).join('\n')
+      
+      alert(`Project ${projectId} cleanup completed!
+
+${summary}
+
+You should now be able to delete the project.`)
+      
+    } catch (err) {
+      console.error('Failed to cleanup project dependencies:', err)
+      alert('Failed to cleanup project dependencies. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (loading && !refreshing) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -212,6 +275,20 @@ Check console for session details.`)
             >
               <Power className="h-4 w-4 mr-1" />
               Force Cleanup All
+            </button>
+            <button
+              onClick={handleDebugProject}
+              className="flex items-center px-3 py-2 text-sm bg-purple-600 text-white rounded hover:bg-purple-700"
+            >
+              <AlertTriangle className="h-4 w-4 mr-1" />
+              Debug Project
+            </button>
+            <button
+              onClick={() => handleCleanupProject()}
+              className="flex items-center px-3 py-2 text-sm bg-purple-800 text-white rounded hover:bg-purple-900"
+            >
+              <Power className="h-4 w-4 mr-1" />
+              Cleanup Project
             </button>
           </div>
         </div>
