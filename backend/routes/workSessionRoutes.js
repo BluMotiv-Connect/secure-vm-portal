@@ -23,12 +23,12 @@ publicRouter.get('/download/rdp/:token', async (req, res) => {
     console.log('[RDP Download] Request method:', req.method)
     console.log('[RDP Download] User Agent:', req.headers['user-agent'])
     console.log('[RDP Download] ==========================================')
-    
+
     // Set CORS headers for the download
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-    
+
     const result = await pool.query(`
       SELECT content, vm_id FROM temp_connections 
       WHERE token = $1 AND expires_at > NOW()
@@ -38,13 +38,13 @@ publicRouter.get('/download/rdp/:token', async (req, res) => {
 
     if (result.rows.length === 0) {
       console.log('[RDP Download] ❌ RDP file not found or expired for token:', token)
-      
+
       // Let's also check if the token exists but is expired
       const expiredCheck = await pool.query(`
         SELECT token, expires_at, created_at FROM temp_connections 
         WHERE token = $1
       `, [token])
-      
+
       if (expiredCheck.rows.length > 0) {
         console.log('[RDP Download] Token found but expired:', expiredCheck.rows[0])
         return res.status(410).send('RDP file has expired. Please start a new work session.')
@@ -66,7 +66,7 @@ publicRouter.get('/download/rdp/:token', async (req, res) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
     res.setHeader('Pragma', 'no-cache')
     res.setHeader('Expires', '0')
-    
+
     // Send as plain text
     res.send(rdpContent)
 
@@ -284,12 +284,12 @@ authenticatedRouter.post('/start', async (req, res) => {
     const { task_id, session_type, vm_id, reason } = req.body
     const userId = req.user.id
 
-    console.log('[Start Session] Starting work session:', { 
-      userId, 
-      task_id, 
-      session_type, 
-      vm_id, 
-      reason 
+    console.log('[Start Session] Starting work session:', {
+      userId,
+      task_id,
+      session_type,
+      vm_id,
+      reason
     })
 
     // Verify task belongs to user
@@ -389,9 +389,85 @@ authenticatedRouter.post('/end-session', async (req, res) => {
   }
 })
 
+// Simple debug endpoint to check basic session data
+authenticatedRouter.get('/debug/simple-sessions', async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' })
+    }
+
+    // Simple query without joins to avoid timeout
+    const result = await pool.query(`
+      SELECT id, user_id, task_id, is_active, end_time, start_time
+      FROM work_sessions 
+      WHERE is_active = true AND end_time IS NULL
+      ORDER BY start_time DESC
+      LIMIT 20
+    `)
+
+    console.log(`[Simple Debug] Found ${result.rows.length} active sessions`)
+    
+    res.json({
+      success: true,
+      activeSessions: result.rows.length,
+      sessions: result.rows
+    })
+  } catch (error) {
+    console.error('[Simple Debug] ❌ Error:', error)
+    res.status(500).json({ error: 'Failed to fetch simple debug sessions' })
+  }
+})
+
+// Debug endpoint to check all sessions
+authenticatedRouter.get('/debug/all-sessions', async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' })
+    }
+
+    const result = await pool.query(`
+      SELECT 
+        ws.*,
+        u.name as user_name,
+        u.email as user_email,
+        t.task_name,
+        p.name as project_name
+      FROM work_sessions ws
+      JOIN users u ON ws.user_id = u.id
+      JOIN tasks t ON ws.task_id = t.id
+      JOIN projects p ON t.project_id = p.id
+      ORDER BY ws.start_time DESC
+      LIMIT 50
+    `)
+
+    console.log(`[Debug Sessions] Found ${result.rows.length} total sessions`)
+    
+    const activeSessions = result.rows.filter(s => s.is_active && !s.end_time)
+    console.log(`[Debug Sessions] Found ${activeSessions.length} active sessions`)
+    
+    res.json({
+      success: true,
+      totalSessions: result.rows.length,
+      activeSessions: activeSessions.length,
+      sessions: result.rows,
+      activeSessionsDetails: activeSessions
+    })
+  } catch (error) {
+    console.error('[Debug Sessions] ❌ Error:', error)
+    res.status(500).json({ error: 'Failed to fetch debug sessions' })
+  }
+})
+
 // Add a cleanup endpoint for stale sessions
 authenticatedRouter.post('/cleanup-stale-sessions', async (req, res) => {
   try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' })
+    }
+
     // Clean up sessions that are marked active but have no activity for over an hour
     const result = await pool.query(`
       UPDATE work_sessions 
@@ -413,6 +489,37 @@ authenticatedRouter.post('/cleanup-stale-sessions', async (req, res) => {
   } catch (error) {
     console.error('[Cleanup Sessions] ❌ Error:', error)
     res.status(500).json({ error: 'Failed to cleanup stale sessions' })
+  }
+})
+
+// Force cleanup all active sessions (admin only)
+authenticatedRouter.post('/cleanup-all-active', async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' })
+    }
+
+    // Clean up ALL active sessions
+    const result = await pool.query(`
+      UPDATE work_sessions 
+      SET end_time = NOW(),
+          is_active = false,
+          duration_minutes = EXTRACT(EPOCH FROM (NOW() - start_time))/60
+      WHERE is_active = true AND end_time IS NULL
+      RETURNING *
+    `)
+
+    console.log(`[Force Cleanup] ✅ Cleaned up ${result.rows.length} active sessions`)
+
+    res.json({
+      success: true,
+      message: `Force cleaned up ${result.rows.length} active sessions`,
+      sessions: result.rows
+    })
+  } catch (error) {
+    console.error('[Force Cleanup] ❌ Error:', error)
+    res.status(500).json({ error: 'Failed to force cleanup sessions' })
   }
 })
 
@@ -765,7 +872,7 @@ authenticatedRouter.post('/admin/bulk-end', async (req, res) => {
 
     // Create placeholders for the IN clause
     const placeholders = sessionIds.map((_, index) => `$${index + 1}`).join(',')
-    
+
     const result = await pool.query(`
       UPDATE work_sessions 
       SET end_time = NOW(), 
@@ -902,19 +1009,19 @@ async function generateAzureRDPFile(vm, userId, sessionId) {
   // Store base64 encoded content
   console.log('[RDP Generation] Storing RDP file in database with token:', tempToken)
   console.log('[RDP Generation] RDP content preview:', rdpContent.substring(0, 200) + '...')
-  
+
   await pool.query(`
     INSERT INTO temp_connections (token, vm_id, user_id, session_id, content, expires_at)
     VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '2 hours')
   `, [tempToken, vm.id, userId, sessionId, base64Content])
 
   console.log('[RDP Generation] ✅ RDP file stored successfully, returning download URL')
-  
+
   // Return full backend URL for RDP download
   const backendUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3001'
   const downloadUrl = `${backendUrl}/api/work-sessions/download/rdp/${tempToken}`
   console.log('[RDP Generation] Full download URL:', downloadUrl)
-  
+
   return downloadUrl
 }
 

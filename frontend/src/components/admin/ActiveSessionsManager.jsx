@@ -114,22 +114,44 @@ const ActiveSessionsManager = () => {
 
   const handleDebugSessions = async () => {
     try {
-      const response = await apiClient.get('/work-sessions/debug/all-sessions')
-      console.log('Debug Sessions Response:', response.data)
+      // Try the simple debug endpoint first
+      const response = await apiClient.get('/work-sessions/debug/simple-sessions')
+      console.log('Simple Debug Sessions Response:', response.data)
       
-      const { totalSessions, activeSessions: activeCount, activeSessionsDetails } = response.data
+      const { activeSessions: activeCount, sessions } = response.data
       
-      alert(`Debug Info:
-Total Sessions: ${totalSessions}
-Active Sessions: ${activeCount}
-Check console for detailed session data.`)
+      alert(`Simple Debug Info:
+Active Sessions Found: ${activeCount}
+Check console for session details.`)
       
-      if (activeCount > 0 && activeCount !== activeSessions.length) {
-        alert(`Mismatch detected! Backend shows ${activeCount} active sessions but UI shows ${activeSessions.length}. Check console for details.`)
+      if (activeCount > 0) {
+        console.log('Active Sessions Details:', sessions)
+        alert(`Found ${activeCount} active sessions! These might be blocking project/task deletion. Use "Cleanup Stale" to remove them.`)
       }
     } catch (err) {
       console.error('Failed to debug sessions:', err)
       alert('Failed to debug sessions. Please try again.')
+    }
+  }
+
+  const handleForceCleanupAll = async () => {
+    if (!confirm('⚠️ WARNING: This will force end ALL active sessions in the system. This should only be used to fix database inconsistencies. Continue?')) {
+      return
+    }
+
+    try {
+      setLoading(true)
+      const response = await apiClient.post('/work-sessions/cleanup-all-active')
+      
+      // Refresh the active sessions list
+      await fetchActiveSessions()
+      
+      alert(`Force cleanup completed! Ended ${response.data.sessions?.length || 0} active sessions.`)
+    } catch (err) {
+      console.error('Failed to force cleanup all sessions:', err)
+      alert('Failed to force cleanup all sessions. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -183,6 +205,13 @@ Check console for detailed session data.`)
             >
               <AlertTriangle className="h-4 w-4 mr-1" />
               Debug
+            </button>
+            <button
+              onClick={handleForceCleanupAll}
+              className="flex items-center px-3 py-2 text-sm bg-red-800 text-white rounded hover:bg-red-900"
+            >
+              <Power className="h-4 w-4 mr-1" />
+              Force Cleanup All
             </button>
           </div>
         </div>
