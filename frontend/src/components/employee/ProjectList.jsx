@@ -84,8 +84,10 @@ const ProjectList = ({ onProjectSelect }) => {
     try {
       await apiClient.delete(`/projects/${projectId}`)
       fetchProjects()
+      setError('') // Clear any previous errors on success
     } catch (error) {
-      setError('Failed to delete project')
+      const errorMessage = error.response?.data?.error || 'Failed to delete project'
+      setError(errorMessage)
       console.error('Delete project error:', error)
     }
   }

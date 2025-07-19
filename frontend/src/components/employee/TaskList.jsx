@@ -119,8 +119,10 @@ const TaskList = ({ project, onTaskSelect }) => {
     try {
       await apiClient.delete(`/tasks/${taskId}`)
       fetchTasks()
+      setError('') // Clear any previous errors on success
     } catch (error) {
-      setError('Failed to delete task')
+      const errorMessage = error.response?.data?.error || 'Failed to delete task'
+      setError(errorMessage)
       console.error('Delete task error:', error)
     }
   }
