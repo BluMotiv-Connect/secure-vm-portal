@@ -91,6 +91,48 @@ const ActiveSessionsManager = () => {
     }
   }
 
+  const handleCleanupStale = async () => {
+    if (!confirm('This will clean up stale sessions that have been active for over 1 hour. Continue?')) {
+      return
+    }
+
+    try {
+      setLoading(true)
+      const response = await apiClient.post('/work-sessions/cleanup-stale-sessions')
+      
+      // Refresh the active sessions list
+      await fetchActiveSessions()
+      
+      alert(`Successfully cleaned up ${response.data.sessions?.length || 0} stale sessions`)
+    } catch (err) {
+      console.error('Failed to cleanup stale sessions:', err)
+      alert('Failed to cleanup stale sessions. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDebugSessions = async () => {
+    try {
+      const response = await apiClient.get('/work-sessions/debug/all-sessions')
+      console.log('Debug Sessions Response:', response.data)
+      
+      const { totalSessions, activeSessions: activeCount, activeSessionsDetails } = response.data
+      
+      alert(`Debug Info:
+Total Sessions: ${totalSessions}
+Active Sessions: ${activeCount}
+Check console for detailed session data.`)
+      
+      if (activeCount > 0 && activeCount !== activeSessions.length) {
+        alert(`Mismatch detected! Backend shows ${activeCount} active sessions but UI shows ${activeSessions.length}. Check console for details.`)
+      }
+    } catch (err) {
+      console.error('Failed to debug sessions:', err)
+      alert('Failed to debug sessions. Please try again.')
+    }
+  }
+
   if (loading && !refreshing) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -128,6 +170,20 @@ const ActiveSessionsManager = () => {
                 End All Sessions
               </button>
             )}
+            <button
+              onClick={handleCleanupStale}
+              className="flex items-center px-3 py-2 text-sm bg-orange-600 text-white rounded hover:bg-orange-700"
+            >
+              <Power className="h-4 w-4 mr-1" />
+              Cleanup Stale
+            </button>
+            <button
+              onClick={handleDebugSessions}
+              className="flex items-center px-3 py-2 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              <AlertTriangle className="h-4 w-4 mr-1" />
+              Debug
+            </button>
           </div>
         </div>
       </div>
