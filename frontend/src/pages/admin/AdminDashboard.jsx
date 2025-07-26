@@ -97,8 +97,8 @@ const AdminDashboard = () => {
           {/* Admin Features Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
             {/* User Management */}
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-6">
+            <div className="bg-white overflow-hidden shadow rounded-lg flex flex-col h-full">
+              <div className="p-6 flex-grow">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
                     <Users className="h-8 w-8 text-blue-600" />
@@ -115,7 +115,7 @@ const AdminDashboard = () => {
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-6 py-3">
+              <div className="bg-gray-50 px-6 py-3 mt-auto">
                 <button 
                   onClick={() => navigate('/admin/users')}
                   className="text-sm text-blue-600 hover:text-blue-700 font-medium"
@@ -126,8 +126,8 @@ const AdminDashboard = () => {
             </div>
 
             {/* VM Management */}
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-6">
+            <div className="bg-white overflow-hidden shadow rounded-lg flex flex-col h-full">
+              <div className="p-6 flex-grow">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
                     <Monitor className="h-8 w-8 text-green-600" />
@@ -144,7 +144,7 @@ const AdminDashboard = () => {
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-6 py-3">
+              <div className="bg-gray-50 px-6 py-3 mt-auto">
                 <button 
                   onClick={() => navigate('/admin/virtual-machines')}
                   className="text-sm text-green-600 hover:text-green-700 font-medium"
@@ -155,8 +155,8 @@ const AdminDashboard = () => {
             </div>
 
             {/* Project Management */}
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-6">
+            <div className="bg-white overflow-hidden shadow rounded-lg flex flex-col h-full">
+              <div className="p-6 flex-grow">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
                     <FolderOpen className="h-8 w-8 text-orange-600" />
@@ -173,7 +173,7 @@ const AdminDashboard = () => {
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-6 py-3">
+              <div className="bg-gray-50 px-6 py-3 mt-auto">
                 <button 
                   onClick={() => navigate('/admin/projects')}
                   className="text-sm text-orange-600 hover:text-orange-700 font-medium"
@@ -184,8 +184,8 @@ const AdminDashboard = () => {
             </div>
 
             {/* Active Sessions Management */}
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-6">
+            <div className="bg-white overflow-hidden shadow rounded-lg flex flex-col h-full">
+              <div className="p-6 flex-grow">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
                     <Activity className="h-8 w-8 text-red-600" />
@@ -202,7 +202,7 @@ const AdminDashboard = () => {
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-6 py-3">
+              <div className="bg-gray-50 px-6 py-3 mt-auto">
                 <button 
                   onClick={() => setShowActiveSessionsManager(true)}
                   className="text-sm text-red-600 hover:text-red-700 font-medium"
@@ -213,8 +213,8 @@ const AdminDashboard = () => {
             </div>
 
             {/* Reports */}
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-6">
+            <div className="bg-white overflow-hidden shadow rounded-lg flex flex-col h-full">
+              <div className="p-6 flex-grow">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
                     <BarChart3 className="h-8 w-8 text-purple-600" />
@@ -231,7 +231,7 @@ const AdminDashboard = () => {
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-6 py-3">
+              <div className="bg-gray-50 px-6 py-3 mt-auto">
                 <button 
                   onClick={() => navigate('/admin/reports')}
                   className="text-sm text-purple-600 hover:text-purple-700 font-medium"
