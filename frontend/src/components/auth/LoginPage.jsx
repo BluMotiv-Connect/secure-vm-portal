@@ -32,26 +32,23 @@ const LoginPage = () => {
     
       console.log('[LoginPage] Login successful, user:', user)
     
-    // Role validation logic
+    // Role validation logic - use database role, not hardcoded emails
       if (selectedRole === 'admin') {
-        // Only vivin@blumotiv.com can be admin
-        if (user.email !== 'vivin@blumotiv.com') {
-          setError('Access denied. Only vivin@blumotiv.com can access admin features.')
+        // Check if user has admin role in database
+        if (user.role !== 'admin') {
+          setError('Access denied. You do not have admin privileges. Please contact administrator.')
           localStorage.removeItem('selectedRole')
           return
         }
+        console.log('[LoginPage] Admin access granted for:', user.email)
       } else if (selectedRole === 'employee') {
-      // Any user added by admin can be employee (except the main admin)
-        if (user.role !== 'employee' && user.email !== 'vivin@blumotiv.com') {
-          setError('Access denied. Please contact administrator to add your account as an employee.')
+        // Any active user can access employee portal, but admins can also access it
+        if (user.role !== 'employee' && user.role !== 'admin') {
+          setError('Access denied. Please contact administrator to add your account to the system.')
           localStorage.removeItem('selectedRole')
           return
         }
-      
-        // Allow vivin@blumotiv.com to access employee portal too
-        if (user.email === 'vivin@blumotiv.com') {
-          console.log('[LoginPage] Admin accessing employee portal')
-        }
+        console.log('[LoginPage] Employee access granted for:', user.email, 'with role:', user.role)
       }
     
       // Clear selected role from storage
@@ -143,7 +140,7 @@ const LoginPage = () => {
           {selectedRole === 'admin' && (
             <div className="mt-4 p-3 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-800">
-                Only <strong>vivin@blumotiv.com</strong> can access admin features
+                Admin access is granted based on your assigned role in the system
               </p>
             </div>
           )}
