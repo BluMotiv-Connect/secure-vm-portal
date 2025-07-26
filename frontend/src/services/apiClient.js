@@ -16,8 +16,10 @@ export const apiClient = axios.create({
 let isRefreshing = false
 let refreshSubscribers = []
 let refreshPromise = null
-let lastRefreshAttempt = 0
-const REFRESH_COOLDOWN = 30000 // 30 seconds cooldown between refresh attempts
+let lastSuccessfulRefresh = 0
+let lastFailedRefresh = 0
+const SUCCESS_COOLDOWN = 60000 // 1 minute cooldown after successful refresh
+const FAILURE_COOLDOWN = 30000 // 30 seconds cooldown after failed refresh
 
 function subscribeTokenRefresh(cb) {
   refreshSubscribers.push(cb)
@@ -48,12 +50,17 @@ async function refreshToken() {
 
   // Check cooldown period to prevent rapid refresh attempts
   const now = Date.now()
-  if (now - lastRefreshAttempt < REFRESH_COOLDOWN) {
-    console.log('Token refresh in cooldown period, skipping...')
-    throw new Error('Token refresh in cooldown period')
+  
+  // Different cooldown periods for success vs failure
+  if (now - lastSuccessfulRefresh < SUCCESS_COOLDOWN) {
+    console.log('Token refresh in success cooldown period, skipping...')
+    throw new Error('Token was recently refreshed successfully')
   }
   
-  lastRefreshAttempt = now
+  if (now - lastFailedRefresh < FAILURE_COOLDOWN) {
+    console.log('Token refresh in failure cooldown period, skipping...')
+    throw new Error('Token refresh recently failed, please wait')
+  }
 
   refreshPromise = (async () => {
     try {
@@ -135,6 +142,7 @@ async function refreshToken() {
         }
         
         console.log('Backend JWT token refreshed successfully')
+        lastSuccessfulRefresh = Date.now()
         return newToken
       } else {
         throw new Error('No token received from backend')
@@ -149,6 +157,8 @@ async function refreshToken() {
         msalAvailable: !!window.msalInstance,
         accountsLength: window.msalInstance?.getAllAccounts()?.length || 0
       })
+      
+      lastFailedRefresh = Date.now()
       
       // Clear auth data and redirect
       clearAuthAndRedirect()

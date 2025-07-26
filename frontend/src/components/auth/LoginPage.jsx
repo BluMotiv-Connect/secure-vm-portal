@@ -112,6 +112,10 @@ const LoginPage = () => {
       if (hasConsented && agreementContent) {
         try {
           console.log('[LoginPage] Recording user consent')
+          
+          // Add a small delay to ensure token is fully propagated
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          
           const consentResult = await consentService.recordConsent(
             agreementContent.version || '1.0.0',
             'en'
@@ -125,6 +129,28 @@ const LoginPage = () => {
           }
         } catch (consentError) {
           console.error('[LoginPage] Consent recording error:', consentError)
+          
+          // If it's a token issue, try one more time after a longer delay
+          if (consentError.message?.includes('Token') || consentError.message?.includes('401')) {
+            try {
+              console.log('[LoginPage] Retrying consent recording after token issue...')
+              await new Promise(resolve => setTimeout(resolve, 2000))
+              
+              const retryResult = await consentService.recordConsent(
+                agreementContent.version || '1.0.0',
+                'en'
+              )
+              
+              if (retryResult.success) {
+                console.log('[LoginPage] Consent recorded successfully on retry')
+              } else {
+                console.warn('[LoginPage] Consent recording failed on retry:', retryResult.error)
+              }
+            } catch (retryError) {
+              console.error('[LoginPage] Consent recording retry also failed:', retryError)
+            }
+          }
+          
           // Continue with login even if consent recording fails
         }
       }
