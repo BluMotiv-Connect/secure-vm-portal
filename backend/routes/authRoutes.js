@@ -19,76 +19,124 @@ const validateAzureToken = async (accessToken) => {
 }
 
 // Login endpoint
-// Login endpoint (updated to handle admin-added users)
+// Login endpoint (enhanced to handle all authentication issues)
 router.post('/login', async (req, res) => {
   try {
     const { accessToken } = req.body
 
+    console.log('[Auth] Login attempt started')
+
     if (!accessToken) {
+      console.log('[Auth] ❌ No access token provided')
       return res.status(400).json({
         error: 'Access token is required'
       })
     }
 
     // Validate token with Microsoft Graph
-    const userInfo = await validateAzureToken(accessToken)
-    console.log('User info from Azure:', userInfo)
+    let userInfo
+    try {
+      userInfo = await validateAzureToken(accessToken)
+      console.log('[Auth] ✅ Azure token validated successfully')
+      console.log('[Auth] User info from Azure:', {
+        id: userInfo.id,
+        email: userInfo.mail || userInfo.userPrincipalName,
+        name: userInfo.displayName
+      })
+    } catch (error) {
+      console.log('[Auth] ❌ Azure token validation failed:', error.message)
+      return res.status(401).json({
+        error: 'Invalid Microsoft token',
+        message: 'Please sign in again with Microsoft'
+      })
+    }
 
     const userEmail = userInfo.mail || userInfo.userPrincipalName
+    
+    if (!userEmail) {
+      console.log('[Auth] ❌ No email found in Azure token')
+      return res.status(400).json({
+        error: 'Email not found in Microsoft account',
+        message: 'Your Microsoft account must have an email address'
+      })
+    }
 
-    // Check if user exists in database
+    console.log('[Auth] Looking for user in database:', userEmail)
+
+    // Check if user exists in database with comprehensive query
     const result = await pool.query(
-      'SELECT * FROM users WHERE email = $1 AND is_active = true',
+      'SELECT * FROM users WHERE LOWER(email) = LOWER($1)',
       [userEmail]
     )
 
     if (result.rows.length === 0) {
-      console.log('User not found in database:', userEmail)
+      console.log('[Auth] ❌ User not found in database:', userEmail)
       return res.status(403).json({
-        error: 'Access denied. Your email address is not authorized. Please contact administrator.',
+        error: 'Access denied. Your email address is not authorized.',
         email: userEmail,
-        message: 'Only users added by admin can access the system.'
+        message: 'Please contact your administrator to be added to the system.',
+        code: 'USER_NOT_FOUND'
       })
     }
 
     const user = result.rows[0]
-    console.log('User found in database:', user)
+    console.log('[Auth] User found in database:', {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      is_active: user.is_active
+    })
+
+    // Check if user is active
+    if (!user.is_active) {
+      console.log('[Auth] ❌ User account is inactive:', userEmail)
+      return res.status(403).json({
+        error: 'Account is inactive',
+        message: 'Your account has been deactivated. Please contact administrator.',
+        code: 'ACCOUNT_INACTIVE'
+      })
+    }
 
     // Update Azure ID if not set (for users added by admin)
     if (!user.azure_id && userInfo.id) {
+      console.log('[Auth] Updating Azure ID for user:', user.email)
       await pool.query(
         'UPDATE users SET azure_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
         [userInfo.id, user.id]
       )
       user.azure_id = userInfo.id
-      console.log('Updated Azure ID for user:', user.email)
     }
 
-    // Update name from Azure if different
-    if (user.name !== userInfo.displayName) {
+    // Update name from Azure if different (and if Azure has a name)
+    if (userInfo.displayName && user.name !== userInfo.displayName) {
+      console.log('[Auth] Updating name for user:', user.email, 'from', user.name, 'to', userInfo.displayName)
       await pool.query(
         'UPDATE users SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
         [userInfo.displayName, user.id]
       )
       user.name = userInfo.displayName
-      console.log('Updated name for user:', user.email)
     }
 
-    console.log('Login successful - Role:', user.role, 'Email:', userEmail)
-
-    // Create JWT token
-    const token = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        iat: Math.floor(Date.now() / 1000),
-        iss: 'secure-vm-portal'
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '2h' } // Shorter expiration for better security
+    // Update last login timestamp
+    await pool.query(
+      'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1',
+      [user.id]
     )
+
+    console.log('[Auth] ✅ Login successful - Role:', user.role, 'Email:', userEmail)
+
+    // Create JWT token with fresh user data
+    const tokenPayload = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      iat: Math.floor(Date.now() / 1000),
+      iss: 'secure-vm-portal'
+    }
+
+    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '2h' })
     
     // Generate refresh token
     const refreshToken = jwt.sign(
@@ -264,6 +312,118 @@ router.post('/logout', (req, res) => {
     success: true,
     message: 'Logged out successfully'
   })
+})
+
+// Admin endpoint to fix user authentication issues
+router.post('/admin/fix-user-auth', async (req, res) => {
+  try {
+    const { email } = req.body
+    
+    if (!email) {
+      return res.status(400).json({
+        error: 'Email is required'
+      })
+    }
+
+    console.log('[Fix User Auth] Attempting to fix authentication for:', email)
+
+    // Find user in database
+    const result = await pool.query(
+      'SELECT * FROM users WHERE LOWER(email) = LOWER($1)',
+      [email]
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: 'User not found in database',
+        email: email,
+        message: 'User needs to be created by admin first'
+      })
+    }
+
+    const user = result.rows[0]
+    
+    // Reset user authentication data
+    await pool.query(`
+      UPDATE users 
+      SET 
+        azure_id = NULL,
+        updated_at = CURRENT_TIMESTAMP,
+        is_active = true
+      WHERE id = $1
+    `, [user.id])
+
+    console.log('[Fix User Auth] ✅ User authentication reset for:', email)
+
+    res.json({
+      success: true,
+      message: 'User authentication reset successfully',
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        is_active: true
+      },
+      instructions: 'User should now be able to sign in with Microsoft'
+    })
+
+  } catch (error) {
+    console.error('[Fix User Auth] ❌ Error:', error)
+    res.status(500).json({
+      error: 'Failed to fix user authentication',
+      message: error.message
+    })
+  }
+})
+
+// Debug endpoint to check user status
+router.get('/admin/check-user/:email', async (req, res) => {
+  try {
+    const { email } = req.params
+    
+    console.log('[Check User] Checking user status for:', email)
+
+    const result = await pool.query(
+      'SELECT * FROM users WHERE LOWER(email) = LOWER($1)',
+      [email]
+    )
+
+    if (result.rows.length === 0) {
+      return res.json({
+        found: false,
+        email: email,
+        message: 'User not found in database',
+        action: 'User needs to be created by admin'
+      })
+    }
+
+    const user = result.rows[0]
+    
+    res.json({
+      found: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        is_active: user.is_active,
+        azure_id: user.azure_id ? 'Set' : 'Not set',
+        created_at: user.created_at,
+        updated_at: user.updated_at,
+        last_login: user.last_login
+      },
+      status: user.is_active ? 'Active' : 'Inactive',
+      canLogin: user.is_active
+    })
+
+  } catch (error) {
+    console.error('[Check User] ❌ Error:', error)
+    res.status(500).json({
+      error: 'Failed to check user status',
+      message: error.message
+    })
+  }
 })
 
 module.exports = router
