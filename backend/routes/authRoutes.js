@@ -426,4 +426,95 @@ router.get('/admin/check-user/:email', async (req, res) => {
   }
 })
 
+// Force refresh user session with current role (for role changes)
+router.post('/refresh-session', async (req, res) => {
+  try {
+    const authHeader = req.headers['authorization']
+    
+    if (!authHeader) {
+      return res.status(401).json({ error: 'Access token required' })
+    }
+
+    const token = authHeader.split(' ')[1]
+    
+    if (!token) {
+      return res.status(401).json({ error: 'Access token required' })
+    }
+
+    // Decode token to get user ID (don't verify expiration for refresh)
+    const decoded = jwt.decode(token)
+    
+    if (!decoded || !decoded.id) {
+      return res.status(401).json({ error: 'Invalid token' })
+    }
+
+    console.log('[Refresh Session] Refreshing session for user ID:', decoded.id)
+
+    // Get current user data from database
+    const result = await pool.query(
+      'SELECT * FROM users WHERE id = $1 AND is_active = true',
+      [decoded.id]
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        error: 'User not found or inactive',
+        message: 'Please sign in again'
+      })
+    }
+
+    const user = result.rows[0]
+    
+    console.log('[Refresh Session] ✅ Generating new token with current role:', user.role)
+
+    // Generate new token with current user data from database
+    const newToken = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role, // This will be the CURRENT role from database
+        iat: Math.floor(Date.now() / 1000),
+        iss: 'secure-vm-portal'
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '2h' }
+    )
+
+    // Generate new refresh token
+    const refreshToken = jwt.sign(
+      {
+        id: user.id,
+        type: 'refresh',
+        iat: Math.floor(Date.now() / 1000),
+        iss: 'secure-vm-portal'
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    )
+
+    const responseUser = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role
+    }
+
+    res.json({
+      success: true,
+      token: newToken,
+      refreshToken: refreshToken,
+      user: responseUser,
+      message: 'Session refreshed with current role'
+    })
+
+  } catch (error) {
+    console.error('[Refresh Session] ❌ Error:', error)
+    res.status(500).json({
+      error: 'Failed to refresh session',
+      message: error.message
+    })
+  }
+})
+
 module.exports = router

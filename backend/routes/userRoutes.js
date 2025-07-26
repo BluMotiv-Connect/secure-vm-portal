@@ -198,6 +198,11 @@ router.put('/:id', requireAdmin, async (req, res) => {
       return res.status(409).json({ error: 'Email is already taken by another user' })
     }
 
+    // Check if role is being changed
+    const oldUserData = await pool.query('SELECT role FROM users WHERE id = $1', [id])
+    const oldRole = oldUserData.rows[0]?.role
+    const roleChanged = oldRole && oldRole !== role
+
     // Update user
     const result = await pool.query(`
       UPDATE users 
@@ -208,10 +213,20 @@ router.put('/:id', requireAdmin, async (req, res) => {
 
     console.log('[Update User] ✅ User updated successfully:', result.rows[0])
 
+    // If role changed, we'll handle it differently
+    if (roleChanged) {
+      console.log('[Update User] 🔄 Role changed from', oldRole, 'to', role, '- user needs to re-login')
+    }
+
     res.json({
       success: true,
       user: result.rows[0],
-      message: 'User updated successfully'
+      message: roleChanged ? 
+        'User updated successfully. User must sign out and sign in again for role change to take effect.' : 
+        'User updated successfully',
+      roleChanged: roleChanged,
+      oldRole: oldRole,
+      newRole: role
     })
   } catch (error) {
     console.error('[Update User] ❌ Error:', error)
