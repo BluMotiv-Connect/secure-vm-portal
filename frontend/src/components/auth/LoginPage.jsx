@@ -29,9 +29,10 @@ const LoginPage = () => {
       console.log('[LoginPage] Starting login for role:', selectedRole)
     
       // Add timeout and proper error handling for async operations
+      // Increased timeout to 70 seconds to accommodate Render wake-up time (up to 50 seconds)
       const loginPromise = login()
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Login timeout after 30 seconds')), 30000)
+        setTimeout(() => reject(new Error('Login timeout after 70 seconds - backend may be sleeping')), 70000)
       )
       
       const user = await Promise.race([loginPromise, timeoutPromise])
