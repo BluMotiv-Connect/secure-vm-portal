@@ -38,6 +38,28 @@ async function deployDatabase() {
       }
     }
     
+    // Apply consent system migration
+    console.log('📄 Applying consent system migration...')
+    const migrationPath = path.join(__dirname, '..', 'database', 'migrations', '001_add_consent_system.sql')
+    
+    if (fs.existsSync(migrationPath)) {
+      const migration = fs.readFileSync(migrationPath, 'utf8')
+      
+      try {
+        await client.query(migration)
+        console.log('✅ Consent system migration applied successfully!')
+      } catch (error) {
+        if (error.message.includes('already applied') || 
+            error.message.includes('already exists')) {
+          console.log('⚠️  Consent system migration already applied, skipping...')
+        } else {
+          throw error
+        }
+      }
+    } else {
+      console.log('⚠️  Consent system migration file not found, skipping...')
+    }
+    
     console.log('✅ Database schema deployed successfully!')
     
     // Verify tables were created

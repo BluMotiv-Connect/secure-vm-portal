@@ -1,17 +1,21 @@
 import React from 'react'
 import { useAuth } from '../../contexts/AuthContext' // Fixed path: ../../ instead of ../
+import { useConsent } from '../../contexts/ConsentContext'
 import { Navigate } from 'react-router-dom'
 
 const AuthGuard = ({ children, requiredRole = null }) => {
   const { isAuthenticated, isLoading, user } = useAuth()
+  const { consentStatus, isLoading: consentLoading, isInitialized: consentInitialized } = useConsent()
 
-  // Show loading spinner while authentication is being determined
-  if (isLoading) {
+  // Show loading spinner while authentication or consent is being determined
+  if (isLoading || consentLoading || !consentInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">
+            {isLoading ? 'Loading...' : 'Checking consent status...'}
+          </p>
         </div>
       </div>
     )
@@ -20,6 +24,14 @@ const AuthGuard = ({ children, requiredRole = null }) => {
   // Only redirect to login if we're sure the user is not authenticated
   if (!isAuthenticated) {
     console.log('[AuthGuard] User not authenticated, redirecting to login')
+    return <Navigate to="/login" replace />
+  }
+
+  // Check consent status - redirect to login if consent is required but not provided
+  // Skip consent check for admin users to avoid blocking admin access
+  const isConsentRequired = process.env.REACT_APP_CONSENT_REQUIRED === 'true'
+  if (isConsentRequired && user?.role !== 'admin' && !consentStatus.hasValidConsent) {
+    console.log('[AuthGuard] Consent required but not provided, redirecting to login')
     return <Navigate to="/login" replace />
   }
 

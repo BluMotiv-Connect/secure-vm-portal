@@ -3,6 +3,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { useMsal } from '@azure/msal-react'
 import { Shield, Users, ArrowLeft } from 'lucide-react'
+import ConsentAgreementModal from '../consent/ConsentAgreementModal'
+import { consentService } from '../../services/consentService'
 
 const LoginPage = () => {
   const { login } = useAuth()
@@ -11,6 +13,13 @@ const LoginPage = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [selectedRole, setSelectedRole] = useState('')
+  
+  // Consent-related state
+  const [showConsentModal, setShowConsentModal] = useState(false)
+  const [hasConsented, setHasConsented] = useState(false)
+  const [agreementContent, setAgreementContent] = useState(null)
+  const [consentLoading, setConsentLoading] = useState(false)
+  const [consentError, setConsentError] = useState('')
 
   useEffect(() => {
     const role = localStorage.getItem('selectedRole')
@@ -19,12 +28,60 @@ const LoginPage = () => {
       return
     }
     setSelectedRole(role)
+    
+    // Load agreement content when component mounts
+    loadAgreementContent()
   }, [navigate])
 
+  // Load agreement content
+  const loadAgreementContent = async () => {
+    try {
+      setConsentLoading(true)
+      const result = await consentService.getAgreement()
+      
+      if (result.success) {
+        setAgreementContent(result.data)
+      } else {
+        setConsentError(result.error)
+      }
+    } catch (error) {
+      console.error('Failed to load agreement content:', error)
+      setConsentError('Failed to load consent agreement')
+    } finally {
+      setConsentLoading(false)
+    }
+  }
+
+  // Handle consent modal actions
+  const handleConsentChange = (consented) => {
+    setHasConsented(consented)
+  }
+
+  const handleConsentModalClose = () => {
+    setShowConsentModal(false)
+    setHasConsented(false)
+  }
+
+  // Show consent modal before login
+  const handleShowConsent = () => {
+    if (!agreementContent) {
+      setError('Unable to load consent agreement. Please refresh the page.')
+      return
+    }
+    setShowConsentModal(true)
+  }
+
   const handleLogin = async () => {
+    // Check if consent is required and not yet given
+    if (!hasConsented) {
+      handleShowConsent()
+      return
+    }
+
     try {
       setIsLoading(true)
       setError('')
+      setShowConsentModal(false)
     
       console.log('[LoginPage] Starting login for role:', selectedRole)
     
@@ -58,6 +115,27 @@ const LoginPage = () => {
         console.log('[LoginPage] User access granted for:', user.email, 'with role:', user.role)
       }
     
+      // Record consent after successful authentication
+      if (hasConsented && agreementContent) {
+        try {
+          console.log('[LoginPage] Recording user consent')
+          const consentResult = await consentService.recordConsent(
+            agreementContent.version || '1.0.0',
+            'en'
+          )
+          
+          if (consentResult.success) {
+            console.log('[LoginPage] Consent recorded successfully')
+          } else {
+            console.warn('[LoginPage] Failed to record consent:', consentResult.error)
+            // Don't block login for consent recording failure, but log it
+          }
+        } catch (consentError) {
+          console.error('[LoginPage] Consent recording error:', consentError)
+          // Continue with login even if consent recording fails
+        }
+      }
+
       // Clear selected role from storage
       localStorage.removeItem('selectedRole')
     
@@ -170,8 +248,10 @@ const LoginPage = () => {
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                 Signing in...
               </div>
-            ) : (
+            ) : hasConsented ? (
               'Sign in with Microsoft'
+            ) : (
+              'Review Agreement & Sign In'
             )}
           </button>
         </div>
@@ -182,6 +262,16 @@ const LoginPage = () => {
           </p>
         </div>
       </div>
+
+      {/* Consent Agreement Modal */}
+      <ConsentAgreementModal
+        isOpen={showConsentModal}
+        onConsentChange={handleConsentChange}
+        onClose={handleConsentModalClose}
+        agreementContent={agreementContent?.content}
+        isLoading={consentLoading}
+        error={consentError}
+      />
     </div>
   )
 }

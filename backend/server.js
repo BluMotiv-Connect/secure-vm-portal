@@ -100,6 +100,12 @@ app.get('/favicon.ico', (req, res) => {
 // Auth routes (no auth required)
 app.use('/api/auth', require('./routes/authRoutes'))
 
+// Consent routes - mixed auth requirements
+const consentRoutes = require('./routes/consentRoutes')
+// Public route for getting agreement content
+app.use('/api/consent', consentRoutes)
+// Protected routes require authentication (handled within the route file)
+
 // Work session routes - public routes first, then authenticated routes
 const { authenticatedRouter: workSessionAuth, publicRouter: workSessionPublic } = require('./routes/workSessionRoutes')
 
@@ -118,6 +124,7 @@ app.use('/api/admin/tasks', authenticateToken, require('./routes/adminTaskRoutes
 app.use('/api/tasks', authenticateToken, require('./routes/taskRoutes'))
 app.use('/api/employee/dashboard', authenticateToken, require('./routes/employeeDashboardRoutes'))
 app.use('/api/reports', authenticateToken, require('./routes/reportRoutes'))
+app.use('/api/admin/consent', authenticateToken, require('./routes/adminConsentRoutes'))
 
 // Health check endpoint (no auth required) - for cron jobs and monitoring
 app.get('/health', (req, res) => {

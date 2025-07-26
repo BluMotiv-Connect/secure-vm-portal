@@ -7,6 +7,7 @@ import { msalConfig } from './config/authConfig'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { NotificationProvider } from './contexts/NotificationContext'
+import { ConsentProvider } from './contexts/ConsentContext'
 import axios from 'axios'
 import keepAliveService from './utils/keepAlive'
 import BackendWakeupLoader from './components/common/BackendWakeupLoader'
@@ -86,9 +87,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <MsalProvider instance={msalInstance}>
         <AuthProvider>
-          <ThemeProvider>
-            <NotificationProvider>
-              <BackendWakeupLoader>
+          <ConsentProvider>
+            <ThemeProvider>
+              <NotificationProvider>
+                <BackendWakeupLoader>
                 <Routes>
                   {/* Public routes */}
                   <Route path="/" element={<RoleSelection />} />
@@ -135,9 +137,10 @@ function App() {
                   {/* Fallback */}
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
-              </BackendWakeupLoader>
-            </NotificationProvider>
-          </ThemeProvider>
+                </BackendWakeupLoader>
+              </NotificationProvider>
+            </ThemeProvider>
+          </ConsentProvider>
         </AuthProvider>
       </MsalProvider>
     </QueryClientProvider>
