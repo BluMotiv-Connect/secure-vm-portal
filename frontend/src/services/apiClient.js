@@ -25,46 +25,22 @@ function onRefreshed(token) {
 
 async function refreshToken() {
   try {
-    const refreshToken = localStorage.getItem('refreshToken')
-    if (!refreshToken) {
-      console.warn('No refresh token available, redirecting to login')
-      throw new Error('No refresh token available')
-    }
+    console.log('Token expired, clearing auth and redirecting to login')
     
-    console.log('Attempting to refresh token...')
-    const response = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken }, { 
-      withCredentials: true,
-      timeout: 10000 // 10 second timeout for refresh
-    })
-    
-    if (response.data.success && response.data.token) {
-      const { token, refreshToken: newRefreshToken } = response.data
-      localStorage.setItem('authToken', token)
-      if (newRefreshToken) {
-        localStorage.setItem('refreshToken', newRefreshToken)
-      }
-      console.log('Token refreshed successfully')
-      return token
-    } else {
-      throw new Error('Invalid refresh response')
-    }
-  } catch (error) {
-    console.error('Token refresh failed:', error.response?.data || error.message)
-    
-    // If refresh token is expired or invalid, clear everything and redirect
-    if (error.response?.status === 401 || error.response?.data?.code === 'TOKEN_EXPIRED') {
-      console.warn('Refresh token expired, clearing auth and redirecting to login')
-      localStorage.removeItem('authToken')
-      localStorage.removeItem('refreshToken')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
-      throw new Error('Refresh token expired')
-    }
-    
-    // For other errors, still clear auth and redirect
-    console.error('Refresh failed, clearing auth and redirecting to login')
+    // For MSAL-based auth, we don't have a refresh token endpoint
+    // Instead, we clear the stored tokens and redirect to login
+    // MSAL will handle the token refresh through its own mechanisms
     localStorage.removeItem('authToken')
-    localStorage.removeItem('refreshToken')
+    localStorage.removeItem('user')
+    
+    // Redirect to login page
+    window.location.href = '/login'
+    throw new Error('Token expired - redirecting to login')
+  } catch (error) {
+    console.error('Token refresh failed:', error.message)
+    
+    // Clear auth and redirect
+    localStorage.removeItem('authToken')
     localStorage.removeItem('user')
     window.location.href = '/login'
     throw error
@@ -168,12 +144,12 @@ apiClient.interceptors.response.use(
         isRefreshing = true
         
         try {
-          // Try to refresh the token
-          const newToken = await refreshToken()
+          // For MSAL-based auth, we don't refresh tokens here
+          // Instead, we clear auth and redirect to login
+          await refreshToken() // This will clear auth and redirect
           isRefreshing = false
-          onRefreshed(newToken)
-          originalRequest.headers.Authorization = `Bearer ${newToken}`
-          return apiClient(originalRequest)
+          onRefreshed(null)
+          return Promise.reject(new Error('Token expired - redirected to login'))
         } catch (refreshError) {
           isRefreshing = false
           onRefreshed(null) // Notify waiting requests that refresh failed
@@ -181,7 +157,6 @@ apiClient.interceptors.response.use(
           
           // Clear stored tokens and redirect to login
           localStorage.removeItem('authToken')
-          localStorage.removeItem('refreshToken')
           localStorage.removeItem('user')
           
           // Redirect to login page
@@ -206,7 +181,6 @@ apiClient.interceptors.response.use(
           if (payload.exp && payload.exp < currentTime) {
             console.warn('Token is expired, clearing auth and redirecting to login...')
             localStorage.removeItem('authToken')
-            localStorage.removeItem('refreshToken')
             localStorage.removeItem('user')
             window.location.href = '/login'
             return Promise.reject(new Error('Token expired'))

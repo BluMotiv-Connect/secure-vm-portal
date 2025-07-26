@@ -7,15 +7,13 @@ const AuthGuard = ({ children, requiredRole = null }) => {
   const { isAuthenticated, isLoading, user } = useAuth()
   const { consentStatus, isLoading: consentLoading, isInitialized: consentInitialized } = useConsent()
 
-  // Show loading spinner while authentication or consent is being determined
-  if (isLoading || consentLoading || !consentInitialized) {
+  // Show loading spinner while authentication is being determined
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">
-            {isLoading ? 'Loading...' : 'Checking consent status...'}
-          </p>
+          <p className="text-gray-600">Loading...</p>
         </div>
       </div>
     )
@@ -27,6 +25,9 @@ const AuthGuard = ({ children, requiredRole = null }) => {
     return <Navigate to="/login" replace />
   }
 
+  // Temporarily disable consent check to debug login issues
+  // TODO: Re-enable after fixing token refresh issue
+  /*
   // Check consent status - redirect to login if consent is required but not provided
   // Skip consent check for admin users to avoid blocking admin access
   const isConsentRequired = process.env.REACT_APP_CONSENT_REQUIRED === 'true'
@@ -34,6 +35,7 @@ const AuthGuard = ({ children, requiredRole = null }) => {
     console.log('[AuthGuard] Consent required but not provided, redirecting to login')
     return <Navigate to="/login" replace />
   }
+  */
 
   // Role validation logic - Allow admin to access both portals
   if (requiredRole) {
