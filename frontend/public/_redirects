@@ -1,1 +1,10 @@
+# SPA routing - all routes should serve index.html
 /*    /index.html   200
+
+# API routes should be proxied to backend (if needed)
+/api/*  https://secure-vm-portal-backend.onrender.com/api/:splat  200
+
+# Specific routes for better SEO (optional)
+/admin    /index.html   200
+/employee /index.html   200
+/login    /index.html   200

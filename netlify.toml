@@ -5,10 +5,17 @@
 
 [build.environment]
   NODE_VERSION = "18"
-  VITE_API_BASE_URL = "https://your-backend-app.cyclic.app/api"
+  VITE_API_BASE_URL = "https://secure-vm-portal-backend.onrender.com/api"
   VITE_AZURE_CLIENT_ID = "your-azure-client-id"
   VITE_AZURE_TENANT_ID = "your-azure-tenant-id"
-  VITE_AZURE_REDIRECT_URI = "https://your-app.netlify.app"
+  VITE_AZURE_REDIRECT_URI = "https://secure-vm-portal-frontend.onrender.com"
+
+# SPA routing configuration
+[[redirects]]
+  from = "/api/*"
+  to = "https://secure-vm-portal-backend.onrender.com/api/:splat"
+  status = 200
+  force = true
 
 [[redirects]]
   from = "/*"

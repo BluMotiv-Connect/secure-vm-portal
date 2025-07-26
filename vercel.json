@@ -11,17 +11,21 @@
   ],
   "routes": [
     {
+      "src": "/api/(.*)",
+      "dest": "https://secure-vm-portal-backend.onrender.com/api/$1"
+    },
+    {
       "src": "/(.*)",
-      "dest": "/frontend/$1"
+      "dest": "/frontend/index.html"
     }
   ],
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
   "installCommand": "cd frontend && npm install",
   "env": {
-    "VITE_API_BASE_URL": "https://your-backend-app.up.railway.app/api",
+    "VITE_API_BASE_URL": "https://secure-vm-portal-backend.onrender.com/api",
     "VITE_AZURE_CLIENT_ID": "your-azure-client-id",
     "VITE_AZURE_TENANT_ID": "your-azure-tenant-id",
-    "VITE_AZURE_REDIRECT_URI": "https://your-app.vercel.app"
+    "VITE_AZURE_REDIRECT_URI": "https://secure-vm-portal-frontend.onrender.com"
   }
 }
