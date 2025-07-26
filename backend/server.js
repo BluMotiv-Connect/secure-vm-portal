@@ -103,12 +103,8 @@ app.use('/api/auth', require('./routes/authRoutes'))
 // Consent routes - mixed auth requirements
 const consentRoutes = require('./routes/consentRoutes')
 
-// Public route for getting agreement content (no auth required)
-app.get('/api/consent/agreement/:version?', consentRoutes)
-app.get('/api/consent/agreement', consentRoutes)
-
-// Protected consent routes require authentication
-app.use('/api/consent', authenticateToken, consentRoutes)
+// Mount consent routes with mixed authentication (handled within routes)
+app.use('/api/consent', consentRoutes)
 
 // Work session routes - public routes first, then authenticated routes
 const { authenticatedRouter: workSessionAuth, publicRouter: workSessionPublic } = require('./routes/workSessionRoutes')

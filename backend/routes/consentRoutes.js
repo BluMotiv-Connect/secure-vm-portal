@@ -1,5 +1,6 @@
 const express = require('express')
 const { Pool } = require('pg')
+const { authenticateToken } = require('../middleware/auth')
 const router = express.Router()
 
 // Database connection
@@ -106,17 +107,9 @@ router.get('/agreement/:version?', async (req, res) => {
   }
 })
 
-// GET /api/consent/status - Check user's consent status
-router.get('/status', async (req, res) => {
+// GET /api/consent/status - Check user's consent status (requires auth)
+router.get('/status', authenticateToken, async (req, res) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({
-        error: 'Unauthorized',
-        message: 'Authentication required',
-        code: 'AUTH_001'
-      })
-    }
-    
     const client = await pool.connect()
     
     try {
@@ -162,17 +155,9 @@ router.get('/status', async (req, res) => {
   }
 })
 
-// POST /api/consent/record - Record user consent
-router.post('/record', async (req, res) => {
+// POST /api/consent/record - Record user consent (requires auth)
+router.post('/record', authenticateToken, async (req, res) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({
-        error: 'Unauthorized',
-        message: 'Authentication required',
-        code: 'AUTH_001'
-      })
-    }
-    
     const { agreementVersion, language = 'en' } = req.body
     
     if (!agreementVersion) {
@@ -268,17 +253,9 @@ router.post('/record', async (req, res) => {
   }
 })
 
-// POST /api/consent/withdraw - Withdraw user consent
-router.post('/withdraw', async (req, res) => {
+// POST /api/consent/withdraw - Withdraw user consent (requires auth)
+router.post('/withdraw', authenticateToken, async (req, res) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({
-        error: 'Unauthorized',
-        message: 'Authentication required',
-        code: 'AUTH_001'
-      })
-    }
-    
     const { reason } = req.body
     
     const client = await pool.connect()
@@ -365,17 +342,9 @@ router.post('/withdraw', async (req, res) => {
   }
 })
 
-// GET /api/consent/history - Get user's consent history (for user profile)
-router.get('/history', async (req, res) => {
+// GET /api/consent/history - Get user's consent history (requires auth)
+router.get('/history', authenticateToken, async (req, res) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({
-        error: 'Unauthorized',
-        message: 'Authentication required',
-        code: 'AUTH_001'
-      })
-    }
-    
     const result = await pool.query(`
       SELECT 
         uuid,
