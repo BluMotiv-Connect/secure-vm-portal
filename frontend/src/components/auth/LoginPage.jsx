@@ -28,7 +28,13 @@ const LoginPage = () => {
     
       console.log('[LoginPage] Starting login for role:', selectedRole)
     
-      const user = await login()
+      // Add timeout and proper error handling for async operations
+      const loginPromise = login()
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Login timeout after 30 seconds')), 30000)
+      )
+      
+      const user = await Promise.race([loginPromise, timeoutPromise])
     
       console.log('[LoginPage] Login successful, user:', user)
     
