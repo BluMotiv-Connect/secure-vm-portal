@@ -72,16 +72,9 @@ const LoginPage = () => {
   }
 
   const handleLogin = async () => {
-    // Check if consent is required and not yet given
-    if (!hasConsented) {
-      handleShowConsent()
-      return
-    }
-
     try {
       setIsLoading(true)
       setError('')
-      setShowConsentModal(false)
     
       console.log('[LoginPage] Starting login for role:', selectedRole)
     
@@ -199,8 +192,8 @@ const LoginPage = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
+      <div className="max-w-lg w-full space-y-6 p-8">
         {/* Back Button */}
         <button
           onClick={handleBackToRoleSelection}
@@ -237,23 +230,122 @@ const LoginPage = () => {
           </div>
         )}
 
+        {/* Consent Agreement Section */}
+        {!hasConsented && (
+          <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+            <div className="text-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                User Consent Agreement Required
+              </h3>
+              <p className="text-sm text-gray-600">
+                Please review and accept the terms before proceeding
+              </p>
+            </div>
+
+            {consentLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                <p className="text-sm text-gray-600">Loading agreement...</p>
+              </div>
+            ) : consentError ? (
+              <div className="text-center py-4">
+                <p className="text-sm text-red-600 mb-2">{consentError}</p>
+                <button
+                  onClick={loadAgreementContent}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : agreementContent ? (
+              <div>
+                {/* Agreement Summary */}
+                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                  <h4 className="font-medium text-gray-900 mb-2">
+                    {agreementContent.content?.title || 'User Consent Agreement for Portal Access'}
+                  </h4>
+                  <p className="text-sm text-gray-600 mb-3">
+                    This agreement outlines the terms of access and use of the portal, including responsibilities 
+                    related to confidentiality, resource usage, data protection, and project conduct.
+                  </p>
+                  <div className="text-xs text-gray-500">
+                    Version: {agreementContent.version || '1.0.0'} • 
+                    Effective: {agreementContent.effectiveDate ? 
+                      new Date(agreementContent.effectiveDate).toLocaleDateString() : 
+                      'Today'
+                    }
+                  </div>
+                </div>
+
+                {/* Key Points */}
+                <div className="mb-4">
+                  <h5 className="text-sm font-medium text-gray-900 mb-2">Key Points:</h5>
+                  <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                    <li>Compliance with GDPR and India's Digital Personal Data Protection Act (DPDP Act, 2023)</li>
+                    <li>Confidentiality of login credentials and responsible resource usage</li>
+                    <li>Proper use of learning resources and project reporting requirements</li>
+                    <li>Data protection, security policies, and monitoring compliance</li>
+                    <li>Intellectual property ownership and repository usage guidelines</li>
+                  </ul>
+                </div>
+
+                {/* Full Agreement Link */}
+                <div className="mb-4">
+                  <button
+                    onClick={handleShowConsent}
+                    className="text-sm text-blue-600 hover:text-blue-800 underline"
+                  >
+                    Read Full Agreement ({agreementContent.content?.sections?.length || 13} sections)
+                  </button>
+                </div>
+
+                {/* Consent Checkbox */}
+                <div className="flex items-start space-x-3">
+                  <input
+                    type="checkbox"
+                    id="inline-consent-checkbox"
+                    checked={hasConsented}
+                    onChange={(e) => handleConsentChange(e.target.checked)}
+                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label 
+                    htmlFor="inline-consent-checkbox" 
+                    className="text-sm text-gray-700 leading-relaxed cursor-pointer"
+                  >
+                    {agreementContent.content?.acknowledgment?.checkbox_text || 
+                     'I agree to the terms and conditions of the User Consent Agreement.'}
+                  </label>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+
         <div>
           <button
             onClick={handleLogin}
-            disabled={isLoading || inProgress !== "none"}
-            className={`group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-${roleInfo.color}-600 hover:bg-${roleInfo.color}-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${roleInfo.color}-500 disabled:opacity-50 disabled:cursor-not-allowed`}
+            disabled={isLoading || inProgress !== "none" || !hasConsented}
+            className={`group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white ${
+              hasConsented 
+                ? `bg-${roleInfo.color}-600 hover:bg-${roleInfo.color}-700` 
+                : 'bg-gray-400 cursor-not-allowed'
+            } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${roleInfo.color}-500 disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             {isLoading ? (
               <div className="flex items-center">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                 Signing in...
               </div>
-            ) : hasConsented ? (
-              'Sign in with Microsoft'
             ) : (
-              'Review Agreement & Sign In'
+              'Sign in with Microsoft'
             )}
           </button>
+          
+          {!hasConsented && (
+            <p className="text-xs text-gray-500 text-center mt-2">
+              Please accept the agreement above to continue
+            </p>
+          )}
         </div>
 
         <div className="text-center">
