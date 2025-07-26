@@ -3,13 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Redirecting...</title>
+    <title>Loading...</title>
     <script>
+        // Store the current path before redirecting
+        const currentPath = window.location.pathname;
+        const currentSearch = window.location.search;
+        const currentHash = window.location.hash;
+        
+        // Store the intended path in sessionStorage so React Router can restore it
+        if (currentPath !== '/') {
+            sessionStorage.setItem('intendedPath', currentPath + currentSearch + currentHash);
+        }
+        
         // Redirect to index.html for SPA routing
-        window.location.replace('/index.html' + window.location.search + window.location.hash);
+        window.location.replace('/index.html' + currentSearch + currentHash);
     </script>
 </head>
 <body>
-    <p>Redirecting...</p>
+    <div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: Arial, sans-serif;">
+        <p>Loading application...</p>
+    </div>
 </body>
 </html>

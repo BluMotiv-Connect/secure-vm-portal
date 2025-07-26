@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { MsalProvider } from '@azure/msal-react'
 import { PublicClientApplication } from '@azure/msal-browser'
 import { QueryClient, QueryClientProvider } from 'react-query'
@@ -39,6 +39,19 @@ const queryClient = new QueryClient({
 })
 
 function App() {
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  // Check for intended path after page refresh
+  useEffect(() => {
+    const intendedPath = sessionStorage.getItem('intendedPath')
+    if (intendedPath && location.pathname === '/') {
+      console.log('[App] Restoring intended path:', intendedPath)
+      sessionStorage.removeItem('intendedPath')
+      navigate(intendedPath, { replace: true })
+    }
+  }, [navigate, location])
+
   // Enhanced backend keep-alive system
   useEffect(() => {
     const initializeKeepAlive = async () => {

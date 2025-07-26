@@ -26,12 +26,6 @@ export const AuthProvider = ({ children }) => {
       return
     }
     
-    // Prevent multiple initialization calls
-    if (isLoading) {
-      console.log('[Auth] Already initializing, skipping...')
-      return
-    }
-    
     console.log('[Auth] MSAL startup complete, initializing auth')
     initializeAuth()
   }, [accounts, inProgress])

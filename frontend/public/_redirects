@@ -1,1 +1,5 @@
+# SPA routing - serve index.html for all routes
+/admin/*    /index.html   200
+/employee/*    /index.html   200
+/login    /index.html   200
 /*    /index.html   200

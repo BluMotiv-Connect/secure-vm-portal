@@ -5,15 +5,21 @@ import { Navigate } from 'react-router-dom'
 const AuthGuard = ({ children, requiredRole = null }) => {
   const { isAuthenticated, isLoading, user } = useAuth()
 
+  // Show loading spinner while authentication is being determined
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
       </div>
     )
   }
 
+  // Only redirect to login if we're sure the user is not authenticated
   if (!isAuthenticated) {
+    console.log('[AuthGuard] User not authenticated, redirecting to login')
     return <Navigate to="/login" replace />
   }
 
