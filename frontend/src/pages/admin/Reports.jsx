@@ -894,19 +894,54 @@ const Reports = () => {
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.lastActivity}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                 <button
-                                  onClick={() => {
+                                  onClick={async () => {
                                     const targetUser = users.find(u => u.email === user.email)
                                     if (targetUser) {
-                                      setFilters({
+                                      const newFilters = {
                                         ...filters,
                                         reportType: 'individual-user',
                                         userId: targetUser.id.toString()
-                                      })
+                                      }
+                                      setFilters(newFilters)
+                                      
+                                      // Generate the individual user report immediately
+                                      try {
+                                        setLoading(true)
+                                        setError('')
+                                        
+                                        const [usersResponse, vmsResponse, sessionsResponse, projectsResponse] = await Promise.all([
+                                          apiClient.get('/users'),
+                                          apiClient.get('/vms'),
+                                          apiClient.get('/work-sessions/admin/all', { 
+                                            params: { 
+                                              startDate: newFilters.startDate, 
+                                              endDate: newFilters.endDate,
+                                              userId: newFilters.userId,
+                                              limit: 1000 
+                                            } 
+                                          }),
+                                          apiClient.get('/projects')
+                                        ])
+
+                                        const allUsers = usersResponse.data.users || []
+                                        const vms = vmsResponse.data.vms || []
+                                        const sessions = sessionsResponse.data.sessions || []
+                                        const projects = projectsResponse.data.projects || []
+
+                                        const individualReport = calculateIndividualUserReport(allUsers, vms, sessions, projects, newFilters.userId)
+                                        setReportData(individualReport)
+                                      } catch (error) {
+                                        console.error('Failed to generate individual user report:', error)
+                                        setError('Failed to generate user details: ' + (error.response?.data?.error || error.message))
+                                      } finally {
+                                        setLoading(false)
+                                      }
                                     }
                                   }}
-                                  className="text-purple-600 hover:text-purple-900"
+                                  disabled={loading}
+                                  className="text-purple-600 hover:text-purple-900 disabled:opacity-50"
                                 >
-                                  View Details
+                                  {loading ? 'Loading...' : 'View Details'}
                                 </button>
                               </td>
                             </tr>
