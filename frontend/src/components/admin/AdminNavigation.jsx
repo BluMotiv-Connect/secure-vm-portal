@@ -29,7 +29,7 @@ const AdminNavigation = ({ currentUser }) => {
             onClick={() => navigate('/employee')}
             className="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
           >
-            Employee Portal
+            User Portal
           </button>
         </div>
       </div>

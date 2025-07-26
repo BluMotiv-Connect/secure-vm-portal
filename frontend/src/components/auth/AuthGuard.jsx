@@ -58,12 +58,12 @@ const checkRoleAccess = (user, requiredRole) => {
     return false
   }
 
-  // Admin can access both admin and employee portals
+  // Admin can access both admin and user portals
   if (user.role === 'admin') {
     return true // Admin has access to everything
   }
 
-  // Employee can only access employee portal
+  // Regular users can only access user portal
   if (user.role === 'employee' && requiredRole === 'employee') {
     return true
   }

@@ -123,7 +123,7 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
         })}
         error={formErrors.role?.message || errors.role?.[0]}
       >
-        <option value="employee">Employee</option>
+        <option value="employee">User</option>
         <option value="admin">Administrator</option>
       </Select>
 

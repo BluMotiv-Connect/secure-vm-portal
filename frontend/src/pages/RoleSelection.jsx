@@ -55,7 +55,7 @@ const RoleSelection = () => {
             </div>
           </div>
 
-          {/* Employee Option */}
+          {/* User Option */}
           <div 
             onClick={() => handleRoleSelection('employee')}
             className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer border-2 border-transparent hover:border-green-500 p-8"

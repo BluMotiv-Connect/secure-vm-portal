@@ -83,8 +83,8 @@ const VirtualMachines = () => {
   const fetchUsers = async () => {
     try {
       const response = await apiClient.get('/users')
-      const employeeUsers = response.data.users.filter(user => user.role === 'employee' && user.is_active)
-      setUsers(employeeUsers)
+      const regularUsers = response.data.users.filter(user => user.role === 'employee' && user.is_active)
+      setUsers(regularUsers)
     } catch (error) {
       console.error('Fetch users error:', error)
     }
@@ -901,14 +901,14 @@ const VirtualMachines = () => {
 
             <div className="p-6">
               <p className="text-sm text-gray-600 mb-4">
-                Select an employee to assign this virtual machine to:
+                Select a user to assign this virtual machine to:
               </p>
 
               {users.length === 0 ? (
                 <div className="text-center py-8">
                   <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No employees available for assignment</p>
-                  <p className="text-sm text-gray-500 mt-2">Add employees in User Management first</p>
+                  <p className="text-gray-600">No users available for assignment</p>
+                  <p className="text-sm text-gray-500 mt-2">Add users in User Management first</p>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-64 overflow-y-auto">

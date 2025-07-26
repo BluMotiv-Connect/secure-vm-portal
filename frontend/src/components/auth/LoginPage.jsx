@@ -49,13 +49,13 @@ const LoginPage = () => {
         }
         console.log('[LoginPage] Admin access granted for:', user.email)
       } else if (selectedRole === 'employee') {
-        // Any active user can access employee portal, but admins can also access it
+        // Any active user can access user portal, but admins can also access it
         if (user.role !== 'employee' && user.role !== 'admin') {
           setError('Access denied. Please contact administrator to add your account to the system.')
           localStorage.removeItem('selectedRole')
           return
         }
-        console.log('[LoginPage] Employee access granted for:', user.email, 'with role:', user.role)
+        console.log('[LoginPage] User access granted for:', user.email, 'with role:', user.role)
       }
     
       // Clear selected role from storage
@@ -98,7 +98,7 @@ const LoginPage = () => {
     } else {
       return {
         icon: Users,
-        title: 'Employee Login',
+        title: 'User Login',
         description: 'Sign in to access your assigned VMs',
         color: 'green'
       }

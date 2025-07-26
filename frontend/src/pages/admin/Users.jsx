@@ -222,7 +222,7 @@ const Users = () => {
       
       const testUser = {
         email: 'test@blumotiv.com',
-        name: 'Test Employee',
+        name: 'Test User',
         role: 'employee',
         is_active: true
       }
@@ -287,7 +287,7 @@ const Users = () => {
           <div className="flex justify-between items-center mb-6">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Users</h2>
-              <p className="text-gray-600">Manage user accounts and permissions. Only added users can log in as employees.</p>
+              <p className="text-gray-600">Manage user accounts and permissions. Only added users can log in to the system.</p>
             </div>
             <div className="flex items-center space-x-2">
               <button
@@ -389,7 +389,7 @@ const Users = () => {
                       placeholder="user@blumotiv.com"
                       required
                     />
-                    <p className="text-xs text-gray-500 mt-1">Only this email can log in as employee</p>
+                    <p className="text-xs text-gray-500 mt-1">Only this email can log in to the system</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -413,7 +413,7 @@ const Users = () => {
                       onChange={(e) => setFormData({...formData, role: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="employee">Employee</option>
+                      <option value="employee">User</option>
                       <option value="admin">Admin</option>
                     </select>
                   </div>

@@ -173,7 +173,7 @@ const UserManagement = () => {
       case 'deactivate':
         await bulkUpdate({ userIds, updates: { isActive: false } })
         break
-      case 'makeEmployee':
+      case 'makeUser':
         await bulkUpdate({ userIds, updates: { role: 'employee' } })
         break
     }
@@ -316,7 +316,7 @@ const UserManagement = () => {
                 >
                   <option value="">All Roles</option>
                   <option value="admin">Admin</option>
-                  <option value="employee">Employee</option>
+                  <option value="employee">User</option>
                 </Select>
 
                 <Select
@@ -376,9 +376,9 @@ const UserManagement = () => {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => handleBulkAction('makeEmployee')}
+                  onClick={() => handleBulkAction('makeUser')}
                 >
-                  Make Employee
+                  Make User
                 </Button>
                 <Button
                   size="sm"

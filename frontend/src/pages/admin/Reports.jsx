@@ -346,7 +346,7 @@ const Reports = () => {
       reportType: 'summary',
       summary: {
         totalUsers: users.length,
-        activeEmployees: employees.length,
+        activeUsers: employees.length,
         totalVMs: vms.length,
         onlineVMs: onlineVMs.length,
         assignedVMs: assignedVMs.length,

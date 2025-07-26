@@ -333,7 +333,7 @@ b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAFwAAAAdzc2gtcn...
                 <h4 className="font-medium text-gray-900 mb-2">Security Information</h4>
                 <ul className="text-sm text-gray-600 space-y-1">
                   <li>• All credentials are encrypted and stored securely</li>
-                  <li>• Employees never see or have access to VM credentials</li>
+                  <li>• Users never see or have access to VM credentials</li>
                   <li>• Credentials are automatically injected during connections</li>
                   <li>• Regular credential rotation is recommended for security</li>
                   <li>• All credential access is logged for audit purposes</li>
