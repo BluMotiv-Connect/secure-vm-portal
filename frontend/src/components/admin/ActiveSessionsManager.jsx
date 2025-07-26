@@ -237,59 +237,84 @@ You should now be able to delete the project.`)
               Active VM Sessions ({activeSessions.length})
             </h3>
           </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="flex items-center px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-            >
-              <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
-            {activeSessions.length > 0 && (
+          
+          {/* Organized Button Groups */}
+          <div className="flex items-center space-x-3">
+            {/* Primary Actions */}
+            <div className="flex items-center space-x-2">
               <button
-                onClick={handleBulkEndSessions}
-                className="flex items-center px-3 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="flex items-center px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                title="Refresh session list"
+              >
+                <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+              
+              {activeSessions.length > 0 && (
+                <button
+                  onClick={handleBulkEndSessions}
+                  className="flex items-center px-3 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+                  title="End all active sessions"
+                >
+                  <Power className="h-4 w-4 mr-1" />
+                  End All
+                </button>
+              )}
+            </div>
+
+            {/* Maintenance Actions */}
+            <div className="flex items-center space-x-2 border-l border-gray-300 pl-3">
+              <button
+                onClick={handleCleanupStale}
+                className="flex items-center px-3 py-2 text-sm bg-orange-600 text-white rounded hover:bg-orange-700"
+                title="Clean up stale sessions (1+ hours old)"
               >
                 <Power className="h-4 w-4 mr-1" />
-                End All Sessions
+                Cleanup Stale
               </button>
-            )}
-            <button
-              onClick={handleCleanupStale}
-              className="flex items-center px-3 py-2 text-sm bg-orange-600 text-white rounded hover:bg-orange-700"
-            >
-              <Power className="h-4 w-4 mr-1" />
-              Cleanup Stale
-            </button>
-            <button
-              onClick={handleDebugSessions}
-              className="flex items-center px-3 py-2 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
-            >
-              <AlertTriangle className="h-4 w-4 mr-1" />
-              Debug
-            </button>
-            <button
-              onClick={handleForceCleanupAll}
-              className="flex items-center px-3 py-2 text-sm bg-red-800 text-white rounded hover:bg-red-900"
-            >
-              <Power className="h-4 w-4 mr-1" />
-              Force Cleanup All
-            </button>
-            <button
-              onClick={handleDebugProject}
-              className="flex items-center px-3 py-2 text-sm bg-purple-600 text-white rounded hover:bg-purple-700"
-            >
-              <AlertTriangle className="h-4 w-4 mr-1" />
-              Debug Project
-            </button>
-            <button
-              onClick={() => handleCleanupProject()}
-              className="flex items-center px-3 py-2 text-sm bg-purple-800 text-white rounded hover:bg-purple-900"
-            >
-              <Power className="h-4 w-4 mr-1" />
-              Cleanup Project
-            </button>
+              
+              <button
+                onClick={handleDebugSessions}
+                className="flex items-center px-3 py-2 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
+                title="Debug session issues"
+              >
+                <AlertTriangle className="h-4 w-4 mr-1" />
+                Debug
+              </button>
+            </div>
+
+            {/* Advanced Actions Dropdown */}
+            <div className="relative border-l border-gray-300 pl-3">
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handleForceCleanupAll}
+                  className="flex items-center px-3 py-2 text-sm bg-red-800 text-white rounded hover:bg-red-900"
+                  title="⚠️ Emergency: Force end ALL sessions"
+                >
+                  <Power className="h-4 w-4 mr-1" />
+                  Force All
+                </button>
+                
+                <div className="flex items-center space-x-1">
+                  <button
+                    onClick={handleDebugProject}
+                    className="flex items-center px-2 py-2 text-sm bg-purple-600 text-white rounded-l hover:bg-purple-700"
+                    title="Debug project dependencies"
+                  >
+                    <AlertTriangle className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleCleanupProject()}
+                    className="flex items-center px-2 py-2 text-sm bg-purple-800 text-white rounded-r hover:bg-purple-900"
+                    title="Cleanup project dependencies"
+                  >
+                    <Power className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

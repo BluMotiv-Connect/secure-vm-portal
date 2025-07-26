@@ -8,6 +8,7 @@ import ActiveSessionsManager from '../../components/admin/ActiveSessionsManager'
 const AdminDashboard = () => {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const [showActiveSessionsManager, setShowActiveSessionsManager] = useState(false)
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalVMs: 0,
@@ -183,7 +184,7 @@ const AdminDashboard = () => {
             </div>
 
             {/* Active Sessions Management */}
-            <div className="bg-white overflow-hidden shadow rounded-lg border-l-4 border-red-500">
+            <div className="bg-white overflow-hidden shadow rounded-lg">
               <div className="p-6">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
@@ -201,16 +202,16 @@ const AdminDashboard = () => {
                   </div>
                 </div>
               </div>
-              <div className="bg-red-50 px-6 py-3">
+              <div className="bg-gray-50 px-6 py-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-red-600 font-medium">
                     {stats.activeSessions} Active Now
                   </span>
                   <button 
-                    onClick={() => document.getElementById('active-sessions-section').scrollIntoView({ behavior: 'smooth' })}
+                    onClick={() => setShowActiveSessionsManager(true)}
                     className="text-sm text-red-600 hover:text-red-700 font-medium"
                   >
-                    View Sessions →
+                    Manage Sessions →
                   </button>
                 </div>
               </div>
@@ -269,12 +270,30 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* Active Sessions Management */}
-          <div id="active-sessions-section" className="mt-8">
-            <ActiveSessionsManager />
-          </div>
         </div>
       </main>
+
+      {/* Active Sessions Manager Modal */}
+      {showActiveSessionsManager && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">Active Sessions Management</h2>
+              <button
+                onClick={() => setShowActiveSessionsManager(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
+              <ActiveSessionsManager onStatsUpdate={fetchStats} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
