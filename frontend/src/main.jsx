@@ -9,6 +9,9 @@ import './index.css'
 // Create and initialize MSAL instance
 const msalInstance = new PublicClientApplication(msalConfig)
 
+// Make MSAL instance globally available for token refresh
+window.msalInstance = msalInstance
+
 // Initialize MSAL before rendering the app
 const initializeAndRender = async () => {
   try {

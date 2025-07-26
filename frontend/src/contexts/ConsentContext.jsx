@@ -60,7 +60,16 @@ export const ConsentProvider = ({ children }) => {
           currentVersion: null
         })
       } else {
-        setError(error.response?.data?.message || 'Failed to check consent status')
+        console.warn('[ConsentContext] Error checking consent status:', error.response?.data?.message || error.message)
+        // Don't set error for initialization failures, just use default state
+        setConsentStatus({
+          hasValidConsent: false,
+          consentDate: null,
+          agreementVersion: null,
+          language: 'en',
+          requiresNewConsent: true,
+          currentVersion: null
+        })
       }
       
       return null
@@ -177,11 +186,21 @@ export const ConsentProvider = ({ children }) => {
       // This prevents unnecessary API calls during app initialization
       if (typeof window !== 'undefined') {
         const token = localStorage.getItem('authToken')
-        if (token) {
-          await checkConsentStatus()
+        const user = localStorage.getItem('user')
+        
+        if (token && user) {
+          try {
+            await checkConsentStatus()
+          } catch (error) {
+            console.warn('[ConsentContext] Failed to check consent status during initialization:', error)
+            setIsInitialized(true)
+          }
         } else {
+          // No auth token, mark as initialized but no consent check needed
           setIsInitialized(true)
         }
+      } else {
+        setIsInitialized(true)
       }
     }
 

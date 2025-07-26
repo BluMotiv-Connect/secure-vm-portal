@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react'
 import { useMsal } from '@azure/msal-react'
 import { loginRequest } from '../config/authConfig'
 import { apiClient } from '../services/apiClient'
+import { isTokenValid, clearAuthStorage, getStoredAuth } from '../utils/tokenUtils'
+import tokenRefreshScheduler from '../utils/tokenRefreshScheduler'
 
 const AuthContext = createContext()
 
@@ -35,15 +37,26 @@ export const AuthProvider = ({ children }) => {
       console.log('[Auth] Checking for existing authentication...')
       
       // Check localStorage first
-      const storedUser = localStorage.getItem('user')
-      const storedToken = localStorage.getItem('authToken')
+      const { token: storedToken, user: storedUser } = getStoredAuth()
 
       if (storedUser && storedToken) {
         console.log('[Auth] Found stored credentials')
-        setUser(JSON.parse(storedUser))
-        setIsAuthenticated(true)
-        setIsLoading(false)
-        return
+        
+        // Validate token before using it
+        if (isTokenValid(storedToken)) {
+          // Token is still valid
+          console.log('[Auth] Stored token is valid')
+          setUser(storedUser)
+          setIsAuthenticated(true)
+          setIsLoading(false)
+          
+          // Start proactive token refresh scheduler
+          tokenRefreshScheduler.start()
+          return
+        } else {
+          console.log('[Auth] Stored token is expired, clearing storage')
+          clearAuthStorage()
+        }
       }
 
       // Check MSAL accounts
@@ -113,6 +126,9 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true)
       setIsLoading(false)
 
+      // Start proactive token refresh scheduler
+      tokenRefreshScheduler.start()
+
       return finalUserData
     } catch (error) {
       console.error('[Auth] Backend authentication failed:', error)
@@ -141,8 +157,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       console.log('[Auth] Logging out...')
-      localStorage.removeItem('authToken')
-      localStorage.removeItem('user')
+      clearAuthStorage()
       setUser(null)
       setIsAuthenticated(false)
       
@@ -152,12 +167,55 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  const clearAuth = () => {
+    console.log('[Auth] Clearing authentication state')
+    clearAuthStorage()
+    setUser(null)
+    setIsAuthenticated(false)
+    
+    // Stop token refresh scheduler
+    tokenRefreshScheduler.stop()
+  }
+
+  const refreshAuthState = async () => {
+    console.log('[Auth] Refreshing authentication state')
+    try {
+      const { token: storedToken, user: storedUser } = getStoredAuth()
+      
+      if (storedUser && storedToken && isTokenValid(storedToken)) {
+        setUser(storedUser)
+        setIsAuthenticated(true)
+        
+        // Start token refresh scheduler if not already running
+        tokenRefreshScheduler.start()
+        return true
+      } else {
+        setUser(null)
+        setIsAuthenticated(false)
+        if (storedToken && !isTokenValid(storedToken)) {
+          console.log('[Auth] Token expired during refresh, clearing storage')
+          clearAuthStorage()
+        }
+        
+        // Stop token refresh scheduler
+        tokenRefreshScheduler.stop()
+        return false
+      }
+    } catch (error) {
+      console.error('[Auth] Error refreshing auth state:', error)
+      clearAuth()
+      return false
+    }
+  }
+
   const value = {
     user,
     isAuthenticated,
     isLoading,
     login,
-    logout
+    logout,
+    clearAuth,
+    refreshAuthState
   }
 
   return (

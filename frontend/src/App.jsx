@@ -12,6 +12,17 @@ import axios from 'axios'
 import keepAliveService from './utils/keepAlive'
 import BackendWakeupLoader from './components/common/BackendWakeupLoader'
 
+// Import auth testing utilities in development
+if (process.env.NODE_ENV === 'development') {
+  import('./utils/authTest')
+}
+
+// Debug component (only in development)
+let AuthDebug = null
+if (process.env.NODE_ENV === 'development') {
+  AuthDebug = React.lazy(() => import('./components/debug/AuthDebug'))
+}
+
 // Pages
 import RoleSelection from './pages/RoleSelection'
 import LoginPage from './components/auth/LoginPage'
@@ -27,6 +38,9 @@ import AuthGuard from './components/auth/AuthGuard'
 
 // Create and initialize MSAL instance OUTSIDE component tree
 const msalInstance = new PublicClientApplication(msalConfig)
+
+// Make MSAL instance globally available for token refresh
+window.msalInstance = msalInstance
 
 // Create a client
 const queryClient = new QueryClient({
@@ -95,6 +109,15 @@ function App() {
                   {/* Public routes */}
                   <Route path="/" element={<RoleSelection />} />
                   <Route path="/login" element={<LoginPage />} />
+                  
+                  {/* Debug route (development only) */}
+                  {process.env.NODE_ENV === 'development' && AuthDebug && (
+                    <Route path="/debug/auth" element={
+                      <React.Suspense fallback={<div>Loading debug...</div>}>
+                        <AuthDebug />
+                      </React.Suspense>
+                    } />
+                  )}
                   
                   {/* Protected Admin routes */}
                   <Route path="/admin" element={

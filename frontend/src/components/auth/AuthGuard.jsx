@@ -4,30 +4,52 @@ import { useConsent } from '../../contexts/ConsentContext'
 import { Navigate } from 'react-router-dom'
 
 const AuthGuard = ({ children, requiredRole = null }) => {
-  const { isAuthenticated, isLoading, user } = useAuth()
+  const { isAuthenticated, isLoading, user, refreshAuthState } = useAuth()
   const { consentStatus, isLoading: consentLoading, isInitialized: consentInitialized } = useConsent()
 
-  // Show loading spinner while authentication is being determined
-  if (isLoading) {
+  // Show loading spinner while authentication or consent is being determined
+  if (isLoading || consentLoading || !consentInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">
+            {isLoading ? 'Loading...' : 'Checking consent status...'}
+          </p>
         </div>
       </div>
     )
   }
 
-  // Only redirect to login if we're sure the user is not authenticated
+  // Check if we have stored credentials but auth state is false (token refresh scenario)
   if (!isAuthenticated) {
+    const storedToken = localStorage.getItem('authToken')
+    const storedUser = localStorage.getItem('user')
+    
+    if (storedToken && storedUser) {
+      console.log('[AuthGuard] Found stored credentials but auth state is false, refreshing...')
+      console.log('[AuthGuard] Token preview:', storedToken.substring(0, 20) + '...')
+      console.log('[AuthGuard] User preview:', JSON.parse(storedUser).email)
+      
+      // Try to refresh auth state
+      refreshAuthState()
+      
+      // Show loading while refreshing
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Refreshing authentication...</p>
+          </div>
+        </div>
+      )
+    }
+    
     console.log('[AuthGuard] User not authenticated, redirecting to login')
+    console.log('[AuthGuard] No stored credentials found - Token:', !!storedToken, 'User:', !!storedUser)
     return <Navigate to="/login" replace />
   }
 
-  // Temporarily disable consent check to debug login issues
-  // TODO: Re-enable after fixing token refresh issue
-  /*
   // Check consent status - redirect to login if consent is required but not provided
   // Skip consent check for admin users to avoid blocking admin access
   const isConsentRequired = process.env.REACT_APP_CONSENT_REQUIRED === 'true'
@@ -35,7 +57,6 @@ const AuthGuard = ({ children, requiredRole = null }) => {
     console.log('[AuthGuard] Consent required but not provided, redirecting to login')
     return <Navigate to="/login" replace />
   }
-  */
 
   // Role validation logic - Allow admin to access both portals
   if (requiredRole) {

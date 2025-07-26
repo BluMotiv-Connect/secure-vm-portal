@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { isTokenValid, clearAuthStorage } from '../utils/tokenUtils'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
@@ -14,37 +15,151 @@ export const apiClient = axios.create({
 // Helper to refresh token
 let isRefreshing = false
 let refreshSubscribers = []
+let refreshPromise = null
+let lastRefreshAttempt = 0
+const REFRESH_COOLDOWN = 30000 // 30 seconds cooldown between refresh attempts
 
 function subscribeTokenRefresh(cb) {
   refreshSubscribers.push(cb)
 }
+
 function onRefreshed(token) {
   refreshSubscribers.forEach(cb => cb(token))
   refreshSubscribers = []
 }
 
-async function refreshToken() {
-  try {
-    console.log('Token expired, clearing auth and redirecting to login')
-    
-    // For MSAL-based auth, we don't have a refresh token endpoint
-    // Instead, we clear the stored tokens and redirect to login
-    // MSAL will handle the token refresh through its own mechanisms
-    localStorage.removeItem('authToken')
-    localStorage.removeItem('user')
-    
-    // Redirect to login page
+function clearAuthAndRedirect() {
+  console.log('Clearing authentication and redirecting to login...')
+  clearAuthStorage()
+  
+  // Avoid redirect loops by checking current location
+  if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
+    // Store intended path for after login
+    sessionStorage.setItem('intendedPath', window.location.pathname)
     window.location.href = '/login'
-    throw new Error('Token expired - redirecting to login')
-  } catch (error) {
-    console.error('Token refresh failed:', error.message)
-    
-    // Clear auth and redirect
-    localStorage.removeItem('authToken')
-    localStorage.removeItem('user')
-    window.location.href = '/login'
-    throw error
   }
+}
+
+async function refreshToken() {
+  // If already refreshing, return the existing promise
+  if (refreshPromise) {
+    return refreshPromise
+  }
+
+  // Check cooldown period to prevent rapid refresh attempts
+  const now = Date.now()
+  if (now - lastRefreshAttempt < REFRESH_COOLDOWN) {
+    console.log('Token refresh in cooldown period, skipping...')
+    throw new Error('Token refresh in cooldown period')
+  }
+  
+  lastRefreshAttempt = now
+
+  refreshPromise = (async () => {
+    try {
+      console.log('Attempting to refresh MSAL token...')
+      
+      // Get MSAL instance from window (it's globally available)
+      const msalInstance = window.msalInstance
+      if (!msalInstance) {
+        throw new Error('MSAL instance not available')
+      }
+      
+      // Wait for MSAL to be initialized if needed
+      try {
+        await msalInstance.initialize()
+      } catch (initError) {
+        // MSAL might already be initialized, this is okay
+        console.log('MSAL already initialized or initialization failed:', initError.message)
+      }
+      
+      // Get current account
+      const accounts = msalInstance.getAllAccounts()
+      if (accounts.length === 0) {
+        console.error('No MSAL accounts found. User needs to log in again.')
+        throw new Error('No MSAL accounts found - please log in again')
+      }
+      
+      const account = accounts[0]
+      
+      // Try to acquire token silently with proper error handling
+      let msalResponse
+      try {
+        msalResponse = await msalInstance.acquireTokenSilent({
+          scopes: ['openid', 'profile', 'email'],
+          account: account,
+          forceRefresh: true // Force refresh to get a new token
+        })
+      } catch (msalError) {
+        console.error('MSAL silent token acquisition failed:', msalError)
+        
+        // If silent acquisition fails, try interactive login
+        if (msalError.name === 'InteractionRequiredAuthError' || 
+            msalError.name === 'BrowserAuthError') {
+          console.log('Attempting interactive token acquisition...')
+          try {
+            msalResponse = await msalInstance.acquireTokenPopup({
+              scopes: ['openid', 'profile', 'email'],
+              account: account
+            })
+          } catch (interactiveError) {
+            console.error('Interactive token acquisition also failed:', interactiveError)
+            throw new Error('Both silent and interactive token acquisition failed')
+          }
+        } else {
+          throw msalError
+        }
+      }
+      
+      console.log('MSAL token refreshed successfully')
+      
+      // Call backend to get new JWT token (use axios directly to avoid interceptor loop)
+      const backendResponse = await axios.post(`${API_BASE_URL || 'http://localhost:3001/api'}/auth/login`, {
+        accessToken: msalResponse.accessToken
+      }, {
+        timeout: 30000,
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (backendResponse.data.token) {
+        const newToken = backendResponse.data.token
+        const userData = backendResponse.data.user
+        
+        // Update localStorage with new token and user data
+        localStorage.setItem('authToken', newToken)
+        if (userData) {
+          localStorage.setItem('user', JSON.stringify(userData))
+        }
+        
+        console.log('Backend JWT token refreshed successfully')
+        return newToken
+      } else {
+        throw new Error('No token received from backend')
+      }
+      
+    } catch (error) {
+      console.error('Token refresh failed:', error.message)
+      console.error('Token refresh error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        msalAvailable: !!window.msalInstance,
+        accountsLength: window.msalInstance?.getAllAccounts()?.length || 0
+      })
+      
+      // Clear auth data and redirect
+      clearAuthAndRedirect()
+      throw error
+    } finally {
+      // Clear the refresh promise
+      refreshPromise = null
+    }
+  })()
+
+  return refreshPromise
 }
 
 // Function to wake up backend
@@ -65,7 +180,14 @@ apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('authToken')
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+      // Validate token before using it
+      if (isTokenValid(token)) {
+        config.headers.Authorization = `Bearer ${token}`
+      } else {
+        console.warn('Token is expired, clearing storage')
+        clearAuthStorage()
+        // Don't add expired token to request
+      }
     }
     return config
   },
@@ -126,6 +248,9 @@ apiClient.interceptors.response.use(
         
         console.warn('JWT token expired, attempting to refresh...')
         
+        // Prevent retry loops
+        originalRequest._retry = true
+        
         if (isRefreshing) {
           // Queue requests while refreshing
           return new Promise((resolve, reject) => {
@@ -140,29 +265,30 @@ apiClient.interceptors.response.use(
           })
         }
         
-        originalRequest._retry = true
         isRefreshing = true
         
         try {
-          // For MSAL-based auth, we don't refresh tokens here
-          // Instead, we clear auth and redirect to login
-          await refreshToken() // This will clear auth and redirect
+          // Try to refresh the token using MSAL
+          const newToken = await refreshToken()
           isRefreshing = false
-          onRefreshed(null)
-          return Promise.reject(new Error('Token expired - redirected to login'))
+          onRefreshed(newToken)
+          
+          // Retry the original request with new token
+          originalRequest.headers.Authorization = `Bearer ${newToken}`
+          return apiClient(originalRequest)
         } catch (refreshError) {
           isRefreshing = false
           onRefreshed(null) // Notify waiting requests that refresh failed
-          console.error('Token refresh failed, redirecting to login...')
+          console.error('Token refresh failed:', refreshError.message)
           
-          // Clear stored tokens and redirect to login
-          localStorage.removeItem('authToken')
-          localStorage.removeItem('user')
-          
-          // Redirect to login page
-          window.location.href = '/login'
+          // Don't redirect here - let the refresh function handle it
           return Promise.reject(refreshError)
         }
+      } else {
+        // For other 401/403 errors, clear auth and redirect
+        console.warn('Authentication failed with non-token error:', errorData)
+        clearAuthAndRedirect()
+        return Promise.reject(error)
       }
     }
 
@@ -172,22 +298,10 @@ apiClient.interceptors.response.use(
       
       // Check if token exists and is potentially expired
       const token = localStorage.getItem('authToken')
-      if (token) {
-        try {
-          // Decode JWT to check expiration (simple check)
-          const payload = JSON.parse(atob(token.split('.')[1]))
-          const currentTime = Date.now() / 1000
-          
-          if (payload.exp && payload.exp < currentTime) {
-            console.warn('Token is expired, clearing auth and redirecting to login...')
-            localStorage.removeItem('authToken')
-            localStorage.removeItem('user')
-            window.location.href = '/login'
-            return Promise.reject(new Error('Token expired'))
-          }
-        } catch (tokenError) {
-          console.error('Error checking token expiration:', tokenError)
-        }
+      if (token && !isTokenValid(token)) {
+        console.warn('Token is expired, clearing auth and redirecting to login...')
+        clearAuthAndRedirect()
+        return Promise.reject(new Error('Token expired'))
       }
     }
 

@@ -197,6 +197,74 @@ router.get('/validate', async (req, res) => {
   }
 })
 
+// Simple "me" endpoint for testing authentication
+router.get('/me', async (req, res) => {
+  try {
+    const authHeader = req.headers['authorization']
+    
+    if (!authHeader) {
+      return res.status(401).json({ error: 'Access token required' })
+    }
+
+    const token = authHeader.split(' ')[1]
+    
+    if (!token) {
+      return res.status(401).json({ error: 'Access token required' })
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    
+    // Get fresh user data from database
+    const result = await pool.query(
+      'SELECT id, email, name, role, is_active FROM users WHERE id = $1',
+      [decoded.id]
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'User not found' })
+    }
+
+    const user = result.rows[0]
+
+    if (!user.is_active) {
+      return res.status(403).json({ error: 'Account inactive' })
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      },
+      tokenInfo: {
+        issued: new Date(decoded.iat * 1000).toISOString(),
+        expires: new Date(decoded.exp * 1000).toISOString(),
+        issuer: decoded.iss
+      }
+    })
+
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        error: 'Token expired',
+        code: 'TOKEN_EXPIRED'
+      })
+    } else if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ 
+        error: 'Invalid token',
+        code: 'INVALID_TOKEN'
+      })
+    } else {
+      return res.status(401).json({ 
+        error: 'Authentication failed',
+        code: 'AUTH_FAILED'
+      })
+    }
+  }
+})
+
 // Token refresh endpoint
 router.post('/refresh', async (req, res) => {
   try {
