@@ -1,9 +1,27 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { copyFileSync } from 'fs'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: 'copy-redirects',
+      writeBundle() {
+        // Copy _redirects file to dist directory for Render SPA routing
+        try {
+          copyFileSync(
+            path.resolve(__dirname, 'public/_redirects'),
+            path.resolve(__dirname, 'dist/_redirects')
+          )
+          console.log('✅ _redirects file copied to dist directory')
+        } catch (error) {
+          console.warn('⚠️ Could not copy _redirects file:', error.message)
+        }
+      }
+    }
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
