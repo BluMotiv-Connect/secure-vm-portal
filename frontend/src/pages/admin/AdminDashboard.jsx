@@ -203,17 +203,12 @@ const AdminDashboard = () => {
                 </div>
               </div>
               <div className="bg-gray-50 px-6 py-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-red-600 font-medium">
-                    {stats.activeSessions} Active Now
-                  </span>
-                  <button 
-                    onClick={() => setShowActiveSessionsManager(true)}
-                    className="text-sm text-red-600 hover:text-red-700 font-medium"
-                  >
-                    Manage Sessions →
-                  </button>
-                </div>
+                <button 
+                  onClick={() => setShowActiveSessionsManager(true)}
+                  className="text-sm text-red-600 hover:text-red-700 font-medium"
+                >
+                  Manage Sessions →
+                </button>
               </div>
             </div>
 
