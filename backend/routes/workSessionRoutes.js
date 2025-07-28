@@ -55,20 +55,30 @@ publicRouter.get('/download/rdp/:token', async (req, res) => {
     }
 
     // Decode base64 content back to text
-    const rdpContent = Buffer.from(result.rows[0].content, 'base64').toString('utf8')
-    console.log('[RDP Download] ✅ RDP file found, sending content, size:', rdpContent.length, 'characters')
-    console.log('[RDP Download] Content preview:', rdpContent.substring(0, 100) + '...')
+    const content = Buffer.from(result.rows[0].content, 'base64').toString('utf8')
+    
+    // Determine content type based on content
+    const isPowerShell = content.includes('Write-Host') || content.includes('cmdkey')
+    
+    console.log('[RDP Download] ✅ Connection file found, type:', isPowerShell ? 'PowerShell' : 'RDP', 'size:', content.length, 'characters')
+    console.log('[RDP Download] Content preview:', content.substring(0, 100) + '...')
 
-    // Set proper headers for RDP file download
-    res.setHeader('Content-Type', 'application/x-rdp')
-    res.setHeader('Content-Disposition', `attachment; filename="vm-connection.rdp"`)
-    res.setHeader('Content-Length', Buffer.byteLength(rdpContent, 'utf8'))
+    // Set proper headers based on content type
+    if (isPowerShell) {
+      res.setHeader('Content-Type', 'application/octet-stream')
+      res.setHeader('Content-Disposition', `attachment; filename="vm-connection.ps1"`)
+    } else {
+      res.setHeader('Content-Type', 'application/x-rdp')
+      res.setHeader('Content-Disposition', `attachment; filename="vm-connection.rdp"`)
+    }
+    
+    res.setHeader('Content-Length', Buffer.byteLength(content, 'utf8'))
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
     res.setHeader('Pragma', 'no-cache')
     res.setHeader('Expires', '0')
 
     // Send as plain text
-    res.send(rdpContent)
+    res.send(content)
 
   } catch (error) {
     console.error('[RDP Download] ❌ Error downloading RDP file:', error)
@@ -172,10 +182,11 @@ authenticatedRouter.post('/start-vm-session', async (req, res) => {
 • Close the browser tab when finished to end the session`
         } else if (vm.connection_method === 'direct') {
           connectionUrl = await generateAzureRDPFile(vm, userId, session.id)
-          instructions = `An RDP file will be downloaded for direct connection to your Azure VM:
+          instructions = `A PowerShell script will be downloaded for automatic connection to your Azure VM:
 
-• Double-click the downloaded .rdp file
-• Enter credentials if prompted (they're pre-configured)
+• Right-click the downloaded .ps1 file and select "Run with PowerShell"
+• The script will automatically store credentials and launch RDP
+• Your VM window will open with no password prompt required
 • Your session will be tracked automatically
 • Close the RDP window when finished`
         } else {
@@ -250,12 +261,13 @@ authenticatedRouter.post('/start-vm-session', async (req, res) => {
       default:
         // Other/On-premises
         connectionUrl = await generateDirectRDPFile(vm, userId, session.id)
-        instructions = `Direct connection to on-premises VM:
+        instructions = `Direct connection to VM with automatic credentials:
 
-• An RDP file with secure credentials will be downloaded
-• Double-click to connect to your VM
-• Credentials are embedded and temporary
-• Close RDP window when finished working
+• A PowerShell script (.ps1) will be downloaded that handles credentials automatically
+• Right-click the downloaded file and select "Run with PowerShell"
+• The script will store credentials securely and launch the RDP connection
+• Your VM window will open automatically with no password prompt
+• Close the RDP window when finished working
 • Session time is tracked automatically`
     }
 
@@ -1029,6 +1041,19 @@ authenticatedRouter.post('/non-work-log', async (req, res) => {
 })
 
 // Helper functions for generating connection files
+// Helper function to create a batch file that stores credentials and launches RDP
+function createRDPLaunchScript(vm, credentials, rdpContent) {
+  const batchScript = `@echo off
+echo Storing credentials for ${vm.ip_address}...
+cmdkey /generic:TERMSRV/${vm.ip_address} /user:${credentials.username} /pass:${credentials.password}
+echo Launching RDP connection...
+start "" "%temp%\\vm-connection.rdp"
+echo Connection launched. Credentials will be automatically used.
+pause
+`
+  return batchScript
+}
+
 async function generateAzureRDPFile(vm, userId, sessionId) {
   const tempToken = crypto.randomBytes(32).toString('hex')
   console.log('[RDP Generation] Generating RDP file for VM:', vm.id, 'User:', userId, 'Token:', tempToken)
@@ -1050,7 +1075,7 @@ async function generateAzureRDPFile(vm, userId, sessionId) {
     console.log('[RDP Generation] ✅ Default credentials created for VM:', vm.id)
   }
 
-  // Create a simple, standard RDP file content (no BOM, plain text)
+  // Create RDP file content with embedded credentials for automatic login
   const rdpContent = [
     'screen mode id:i:2',
     'use multimon:i:0',
@@ -1076,6 +1101,7 @@ async function generateAzureRDPFile(vm, userId, sessionId) {
     'disable cursor setting:i:0',
     'bitmapcachepersistenable:i:1',
     `full address:s:${vm.ip_address}`,
+    `username:s:${credentials.username}`,
     'audiomode:i:0',
     'redirectprinters:i:1',
     'redirectlocation:i:0',
@@ -1100,15 +1126,51 @@ async function generateAzureRDPFile(vm, userId, sessionId) {
     'use redirection server name:i:0',
     'rdgiskdcproxy:i:0',
     'kdcproxyname:s:',
-    'enablerdsaadauth:i:0'
+    'enablerdsaadauth:i:0',
+    // Add domain (if applicable)
+    'domain:s:'
   ].join('\r\n')
 
-  // Convert to base64 for storage (simple text, no BOM)
-  const base64Content = Buffer.from(rdpContent, 'utf8').toString('base64')
+  // Create a PowerShell script that stores credentials and launches RDP
+  const powershellScript = `# VM Connection Script - Auto-generated
+Write-Host "Setting up connection to ${vm.name} (${vm.ip_address})..." -ForegroundColor Green
 
-  // Store base64 encoded content
-  console.log('[RDP Generation] Storing RDP file in database with token:', tempToken)
-  console.log('[RDP Generation] RDP content preview:', rdpContent.substring(0, 200) + '...')
+# Store credentials in Windows Credential Manager
+$securePassword = ConvertTo-SecureString "${credentials.password}" -AsPlainText -Force
+$credential = New-Object System.Management.Automation.PSCredential("${credentials.username}", $securePassword)
+
+# Store credential for RDP connection
+cmdkey /generic:TERMSRV/${vm.ip_address} /user:${credentials.username} /pass:${credentials.password}
+
+# Create temporary RDP file
+$rdpContent = @"
+${rdpContent}
+"@
+
+$tempRdpFile = "$env:TEMP\\vm-connection-${vm.id}.rdp"
+$rdpContent | Out-File -FilePath $tempRdpFile -Encoding UTF8
+
+Write-Host "Launching RDP connection..." -ForegroundColor Yellow
+Write-Host "Credentials have been stored automatically." -ForegroundColor Green
+
+# Launch RDP connection
+Start-Process -FilePath "mstsc" -ArgumentList $tempRdpFile
+
+Write-Host "RDP connection launched. The window should open shortly." -ForegroundColor Green
+Write-Host "Press any key to clean up temporary files..." -ForegroundColor Yellow
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+
+# Cleanup
+Remove-Item $tempRdpFile -ErrorAction SilentlyContinue
+Write-Host "Cleanup completed." -ForegroundColor Green
+`
+
+  // Store the PowerShell script instead of just the RDP file
+  const base64Content = Buffer.from(powershellScript, 'utf8').toString('base64')
+
+  // Store base64 encoded PowerShell script
+  console.log('[RDP Generation] Storing PowerShell script in database with token:', tempToken)
+  console.log('[RDP Generation] Script preview:', powershellScript.substring(0, 200) + '...')
 
   await pool.query(`
     INSERT INTO temp_connections (token, vm_id, user_id, session_id, content, expires_at)
