@@ -55,30 +55,40 @@ publicRouter.get('/download/rdp/:token', async (req, res) => {
     }
 
     // Decode base64 content back to text
-    const content = Buffer.from(result.rows[0].content, 'base64').toString('utf8')
+    const fullContent = Buffer.from(result.rows[0].content, 'base64').toString('utf8')
     
-    // Determine content type based on content
-    const isPowerShell = content.includes('Write-Host') || content.includes('cmdkey')
+    // Extract content type and actual content
+    let contentType = 'rdp'
+    let actualContent = fullContent
     
-    console.log('[RDP Download] ✅ Connection file found, type:', isPowerShell ? 'PowerShell' : 'RDP', 'size:', content.length, 'characters')
-    console.log('[RDP Download] Content preview:', content.substring(0, 100) + '...')
+    if (fullContent.startsWith('REM CONTENT_TYPE:')) {
+      const lines = fullContent.split('\r\n')
+      const typeMatch = lines[0].match(/REM CONTENT_TYPE:(.+)/)
+      if (typeMatch) {
+        contentType = typeMatch[1]
+        actualContent = lines.slice(1).join('\r\n')
+      }
+    }
+    
+    console.log('[RDP Download] ✅ Connection file found, type:', contentType, 'size:', actualContent.length, 'characters')
+    console.log('[RDP Download] Content preview:', actualContent.substring(0, 100) + '...')
 
     // Set proper headers based on content type
-    if (isPowerShell) {
+    if (contentType === 'batch') {
       res.setHeader('Content-Type', 'application/octet-stream')
-      res.setHeader('Content-Disposition', `attachment; filename="vm-connection.ps1"`)
+      res.setHeader('Content-Disposition', `attachment; filename="vm-connection.bat"`)
     } else {
       res.setHeader('Content-Type', 'application/x-rdp')
       res.setHeader('Content-Disposition', `attachment; filename="vm-connection.rdp"`)
     }
     
-    res.setHeader('Content-Length', Buffer.byteLength(content, 'utf8'))
+    res.setHeader('Content-Length', Buffer.byteLength(actualContent, 'utf8'))
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
     res.setHeader('Pragma', 'no-cache')
     res.setHeader('Expires', '0')
 
     // Send as plain text
-    res.send(content)
+    res.send(actualContent)
 
   } catch (error) {
     console.error('[RDP Download] ❌ Error downloading RDP file:', error)
@@ -182,11 +192,11 @@ authenticatedRouter.post('/start-vm-session', async (req, res) => {
 • Close the browser tab when finished to end the session`
         } else if (vm.connection_method === 'direct') {
           connectionUrl = await generateAzureRDPFile(vm, userId, session.id)
-          instructions = `A PowerShell script will be downloaded for automatic connection to your Azure VM:
+          instructions = `An RDP file will be downloaded for direct connection to your Azure VM:
 
-• Right-click the downloaded .ps1 file and select "Run with PowerShell"
-• The script will automatically store credentials and launch RDP
-• Your VM window will open with no password prompt required
+• Double-click the downloaded .rdp file to open the connection
+• Credentials are embedded in the file for automatic login
+• If prompted for password, it should be pre-filled - just click OK
 • Your session will be tracked automatically
 • Close the RDP window when finished`
         } else {
@@ -261,12 +271,12 @@ authenticatedRouter.post('/start-vm-session', async (req, res) => {
       default:
         // Other/On-premises
         connectionUrl = await generateDirectRDPFile(vm, userId, session.id)
-        instructions = `Direct connection to VM with automatic credentials:
+        instructions = `Direct connection to VM with embedded credentials:
 
-• A PowerShell script (.ps1) will be downloaded that handles credentials automatically
-• Right-click the downloaded file and select "Run with PowerShell"
-• The script will store credentials securely and launch the RDP connection
-• Your VM window will open automatically with no password prompt
+• An RDP file (.rdp) will be downloaded with embedded credentials
+• Double-click the downloaded file to open the RDP connection
+• The connection should open automatically without prompting for password
+• If prompted for credentials, they are pre-filled - just click OK
 • Close the RDP window when finished working
 • Session time is tracked automatically`
     }
@@ -1041,17 +1051,11 @@ authenticatedRouter.post('/non-work-log', async (req, res) => {
 })
 
 // Helper functions for generating connection files
-// Helper function to create a batch file that stores credentials and launches RDP
-function createRDPLaunchScript(vm, credentials, rdpContent) {
-  const batchScript = `@echo off
-echo Storing credentials for ${vm.ip_address}...
-cmdkey /generic:TERMSRV/${vm.ip_address} /user:${credentials.username} /pass:${credentials.password}
-echo Launching RDP connection...
-start "" "%temp%\\vm-connection.rdp"
-echo Connection launched. Credentials will be automatically used.
-pause
-`
-  return batchScript
+// Helper function to encode password for RDP file (Windows DPAPI style)
+function encodeRDPPassword(password) {
+  // Convert password to UTF-16LE and then to hex
+  const utf16Buffer = Buffer.from(password, 'utf16le')
+  return utf16Buffer.toString('hex')
 }
 
 async function generateAzureRDPFile(vm, userId, sessionId) {
@@ -1131,51 +1135,124 @@ async function generateAzureRDPFile(vm, userId, sessionId) {
     'domain:s:'
   ].join('\r\n')
 
-  // Create a PowerShell script that stores credentials and launches RDP
-  const powershellScript = `# VM Connection Script - Auto-generated
-Write-Host "Setting up connection to ${vm.name} (${vm.ip_address})..." -ForegroundColor Green
+  // Try to create RDP file with embedded password, fallback to batch file if needed
+  const usePasswordEmbedding = true // Can be configured based on environment
+  
+  let finalContent
+  let contentType = 'rdp'
+  
+  if (usePasswordEmbedding) {
+    // Create enhanced RDP file with embedded credentials
+    const enhancedRdpContent = [
+    'screen mode id:i:2',
+    'use multimon:i:0',
+    'desktopwidth:i:1920',
+    'desktopheight:i:1080',
+    'session bpp:i:32',
+    'winposstr:s:0,1,320,27,1628,953',
+    'compression:i:1',
+    'keyboardhook:i:2',
+    'audiocapturemode:i:0',
+    'videoplaybackmode:i:1',
+    'connection type:i:7',
+    'networkautodetect:i:1',
+    'bandwidthautodetect:i:1',
+    'displayconnectionbar:i:1',
+    'enableworkspacereconnect:i:0',
+    'disable wallpaper:i:0',
+    'allow font smoothing:i:0',
+    'allow desktop composition:i:0',
+    'disable full window drag:i:1',
+    'disable menu anims:i:1',
+    'disable themes:i:0',
+    'disable cursor setting:i:0',
+    'bitmapcachepersistenable:i:1',
+    `full address:s:${vm.ip_address}`,
+    `username:s:${credentials.username}`,
+    'audiomode:i:0',
+    'redirectprinters:i:1',
+    'redirectlocation:i:0',
+    'redirectcomports:i:0',
+    'redirectsmartcards:i:1',
+    'redirectwebauthn:i:1',
+    'redirectclipboard:i:1',
+    'redirectposdevices:i:0',
+    'autoreconnection enabled:i:1',
+    'authentication level:i:2',
+    'prompt for credentials:i:0',
+    'negotiate security layer:i:1',
+    'remoteapplicationmode:i:0',
+    'alternate shell:s:',
+    'shell working directory:s:',
+    'gatewayhostname:s:',
+    'gatewayusagemethod:i:4',
+    'gatewaycredentialssource:i:4',
+    'gatewayprofileusagemethod:i:0',
+    'promptcredentialonce:i:0',
+    'gatewaybrokeringtype:i:0',
+    'use redirection server name:i:0',
+    'rdgiskdcproxy:i:0',
+    'kdcproxyname:s:',
+    'enablerdsaadauth:i:0',
+    'domain:s:',
+      // Add password in binary format (hex encoded UTF-16LE)
+      `password 51:b:${encodeRDPPassword(credentials.password)}`
+    ].join('\r\n')
+    
+    finalContent = enhancedRdpContent
+  } else {
+    // Fallback: Create a batch file that stores credentials and launches RDP
+    const batchContent = `@echo off
+echo Setting up connection to ${vm.name} (${vm.ip_address})...
+echo.
 
-# Store credentials in Windows Credential Manager
-$securePassword = ConvertTo-SecureString "${credentials.password}" -AsPlainText -Force
-$credential = New-Object System.Management.Automation.PSCredential("${credentials.username}", $securePassword)
-
-# Store credential for RDP connection
+REM Store credentials in Windows Credential Manager
 cmdkey /generic:TERMSRV/${vm.ip_address} /user:${credentials.username} /pass:${credentials.password}
 
-# Create temporary RDP file
-$rdpContent = @"
-${rdpContent}
-"@
+REM Create temporary RDP file
+echo screen mode id:i:2 > "%temp%\\vm-connection.rdp"
+echo use multimon:i:0 >> "%temp%\\vm-connection.rdp"
+echo desktopwidth:i:1920 >> "%temp%\\vm-connection.rdp"
+echo desktopheight:i:1080 >> "%temp%\\vm-connection.rdp"
+echo session bpp:i:32 >> "%temp%\\vm-connection.rdp"
+echo compression:i:1 >> "%temp%\\vm-connection.rdp"
+echo keyboardhook:i:2 >> "%temp%\\vm-connection.rdp"
+echo full address:s:${vm.ip_address} >> "%temp%\\vm-connection.rdp"
+echo username:s:${credentials.username} >> "%temp%\\vm-connection.rdp"
+echo authentication level:i:2 >> "%temp%\\vm-connection.rdp"
+echo prompt for credentials:i:0 >> "%temp%\\vm-connection.rdp"
 
-$tempRdpFile = "$env:TEMP\\vm-connection-${vm.id}.rdp"
-$rdpContent | Out-File -FilePath $tempRdpFile -Encoding UTF8
+echo Launching RDP connection...
+start "" mstsc "%temp%\\vm-connection.rdp"
 
-Write-Host "Launching RDP connection..." -ForegroundColor Yellow
-Write-Host "Credentials have been stored automatically." -ForegroundColor Green
+echo.
+echo Connection launched! The RDP window should open shortly.
+echo Credentials have been stored automatically.
+echo.
+pause
 
-# Launch RDP connection
-Start-Process -FilePath "mstsc" -ArgumentList $tempRdpFile
-
-Write-Host "RDP connection launched. The window should open shortly." -ForegroundColor Green
-Write-Host "Press any key to clean up temporary files..." -ForegroundColor Yellow
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-
-# Cleanup
-Remove-Item $tempRdpFile -ErrorAction SilentlyContinue
-Write-Host "Cleanup completed." -ForegroundColor Green
+REM Cleanup
+del "%temp%\\vm-connection.rdp" 2>nul
 `
+    finalContent = batchContent
+    contentType = 'batch'
+  }
 
-  // Store the PowerShell script instead of just the RDP file
-  const base64Content = Buffer.from(powershellScript, 'utf8').toString('base64')
+  // Convert to base64 for storage
+  const base64Content = Buffer.from(finalContent, 'utf8').toString('base64')
 
-  // Store base64 encoded PowerShell script
-  console.log('[RDP Generation] Storing PowerShell script in database with token:', tempToken)
-  console.log('[RDP Generation] Script preview:', powershellScript.substring(0, 200) + '...')
+  // Store base64 encoded connection file
+  console.log('[RDP Generation] Storing connection file in database with token:', tempToken, 'type:', contentType)
+  console.log('[RDP Generation] Content preview:', finalContent.substring(0, 200) + '...')
+
+  // Store content type in a comment within the content for retrieval
+  const contentWithType = `REM CONTENT_TYPE:${contentType}\r\n${finalContent}`
+  const base64ContentWithType = Buffer.from(contentWithType, 'utf8').toString('base64')
 
   await pool.query(`
     INSERT INTO temp_connections (token, vm_id, user_id, session_id, content, expires_at)
     VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '2 hours')
-  `, [tempToken, vm.id, userId, sessionId, base64Content])
+  `, [tempToken, vm.id, userId, sessionId, base64ContentWithType])
 
   console.log('[RDP Generation] ✅ RDP file stored successfully, returning download URL')
 

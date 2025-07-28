@@ -69,15 +69,12 @@ const VMSelector = ({ task, onWorkStart, onClose }) => {
                     const url = window.URL.createObjectURL(blob);
                     const link = document.createElement('a');
                     link.href = url;
-                    // Determine file extension based on content type
-                    const contentType = blob.type;
-                    const filename = contentType.includes('application/octet-stream') ? 'vm-connection.ps1' : 'vm-connection.rdp';
-                    link.download = filename;
+                    link.download = 'vm-connection.rdp';
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
                     window.URL.revokeObjectURL(url);
-                    console.log('Connection file downloaded successfully:', filename);
+                    console.log('RDP file downloaded successfully');
                   })
                   .catch(error => {
                     console.error('RDP download failed:', error);
@@ -93,7 +90,7 @@ const VMSelector = ({ task, onWorkStart, onClose }) => {
               <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
               </svg>
-              ${connectionUrl.includes('/download/rdp/') ? 'Download Connection Script' : 'Open ' + vmName}
+              ${connectionUrl.includes('/download/rdp/') ? 'Download RDP File' : 'Open ' + vmName}
             </button>
             <button onclick="document.body.removeChild(this.closest('.fixed'));" 
                     class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">
