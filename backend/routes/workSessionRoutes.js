@@ -192,11 +192,11 @@ authenticatedRouter.post('/start-vm-session', async (req, res) => {
 • Close the browser tab when finished to end the session`
         } else if (vm.connection_method === 'direct') {
           connectionUrl = await generateAzureRDPFile(vm, userId, session.id)
-          instructions = `An RDP file will be downloaded for direct connection to your Azure VM:
+          instructions = `A batch file will be downloaded for automatic connection to your Azure VM:
 
-• Double-click the downloaded .rdp file to open the connection
-• Credentials are embedded in the file for automatic login
-• If prompted for password, it should be pre-filled - just click OK
+• Double-click the downloaded .bat file to run the connection script
+• The script will store credentials securely and launch RDP automatically
+• Your VM window will open with no password prompt required
 • Your session will be tracked automatically
 • Close the RDP window when finished`
         } else {
@@ -271,12 +271,12 @@ authenticatedRouter.post('/start-vm-session', async (req, res) => {
       default:
         // Other/On-premises
         connectionUrl = await generateDirectRDPFile(vm, userId, session.id)
-        instructions = `Direct connection to VM with embedded credentials:
+        instructions = `Direct connection to VM with automatic credential storage:
 
-• An RDP file (.rdp) will be downloaded with embedded credentials
-• Double-click the downloaded file to open the RDP connection
-• The connection should open automatically without prompting for password
-• If prompted for credentials, they are pre-filled - just click OK
+• A batch file (.bat) will be downloaded that handles credentials automatically
+• Double-click the downloaded .bat file to run it
+• The script will store credentials securely and launch the RDP connection
+• Your VM window will open automatically with no password prompt
 • Close the RDP window when finished working
 • Session time is tracked automatically`
     }
@@ -1135,8 +1135,8 @@ async function generateAzureRDPFile(vm, userId, sessionId) {
     'domain:s:'
   ].join('\r\n')
 
-  // Try to create RDP file with embedded password, fallback to batch file if needed
-  const usePasswordEmbedding = true // Can be configured based on environment
+  // Use batch file approach for more reliable credential handling
+  const usePasswordEmbedding = false // Batch file is more reliable
   
   let finalContent
   let contentType = 'rdp'
@@ -1201,38 +1201,83 @@ async function generateAzureRDPFile(vm, userId, sessionId) {
     
     finalContent = enhancedRdpContent
   } else {
-    // Fallback: Create a batch file that stores credentials and launches RDP
+    // Create a batch file that stores credentials and launches RDP
     const batchContent = `@echo off
-echo Setting up connection to ${vm.name} (${vm.ip_address})...
+title VM Connection - ${vm.name}
+color 0A
+echo.
+echo ========================================
+echo   VM Connection Setup
+echo ========================================
+echo   VM Name: ${vm.name}
+echo   IP Address: ${vm.ip_address}
+echo   User: ${credentials.username}
+echo ========================================
 echo.
 
-REM Store credentials in Windows Credential Manager
+echo [1/3] Storing credentials securely...
 cmdkey /generic:TERMSRV/${vm.ip_address} /user:${credentials.username} /pass:${credentials.password}
-
-REM Create temporary RDP file
-echo screen mode id:i:2 > "%temp%\\vm-connection.rdp"
-echo use multimon:i:0 >> "%temp%\\vm-connection.rdp"
-echo desktopwidth:i:1920 >> "%temp%\\vm-connection.rdp"
-echo desktopheight:i:1080 >> "%temp%\\vm-connection.rdp"
-echo session bpp:i:32 >> "%temp%\\vm-connection.rdp"
-echo compression:i:1 >> "%temp%\\vm-connection.rdp"
-echo keyboardhook:i:2 >> "%temp%\\vm-connection.rdp"
-echo full address:s:${vm.ip_address} >> "%temp%\\vm-connection.rdp"
-echo username:s:${credentials.username} >> "%temp%\\vm-connection.rdp"
-echo authentication level:i:2 >> "%temp%\\vm-connection.rdp"
-echo prompt for credentials:i:0 >> "%temp%\\vm-connection.rdp"
-
-echo Launching RDP connection...
-start "" mstsc "%temp%\\vm-connection.rdp"
+if %errorlevel% neq 0 (
+    echo ERROR: Failed to store credentials
+    pause
+    exit /b 1
+)
+echo ✓ Credentials stored successfully
 
 echo.
-echo Connection launched! The RDP window should open shortly.
-echo Credentials have been stored automatically.
-echo.
-pause
+echo [2/3] Creating RDP configuration...
+(
+echo screen mode id:i:2
+echo use multimon:i:0
+echo desktopwidth:i:1920
+echo desktopheight:i:1080
+echo session bpp:i:32
+echo compression:i:1
+echo keyboardhook:i:2
+echo audiocapturemode:i:0
+echo videoplaybackmode:i:1
+echo connection type:i:7
+echo networkautodetect:i:1
+echo bandwidthautodetect:i:1
+echo displayconnectionbar:i:1
+echo autoreconnection enabled:i:1
+echo full address:s:${vm.ip_address}
+echo username:s:${credentials.username}
+echo authentication level:i:2
+echo prompt for credentials:i:0
+echo negotiate security layer:i:1
+echo redirectclipboard:i:1
+echo redirectprinters:i:1
+echo redirectsmartcards:i:1
+echo domain:s:
+) > "%temp%\\vm-connection-${vm.id}.rdp"
 
-REM Cleanup
-del "%temp%\\vm-connection.rdp" 2>nul
+if %errorlevel% neq 0 (
+    echo ERROR: Failed to create RDP file
+    pause
+    exit /b 1
+)
+echo ✓ RDP configuration created
+
+echo.
+echo [3/3] Launching RDP connection...
+echo ✓ Starting Remote Desktop Connection...
+echo.
+echo NOTE: The RDP window will open shortly.
+echo       Credentials are stored automatically - no password prompt should appear.
+echo       Close this window after the RDP connection opens.
+echo.
+
+start "" mstsc "%temp%\\vm-connection-${vm.id}.rdp"
+
+echo Connection launched successfully!
+echo You can close this window now.
+echo.
+timeout /t 5 /nobreak >nul
+
+REM Cleanup temporary file
+del "%temp%\\vm-connection-${vm.id}.rdp" 2>nul
+exit
 `
     finalContent = batchContent
     contentType = 'batch'
