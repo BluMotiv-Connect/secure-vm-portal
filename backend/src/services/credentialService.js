@@ -68,16 +68,55 @@ class CredentialService {
   // Get credentials for VM connection (internal use only)
   static async getConnectionCredentials(vmId, userId) {
     try {
-      const credentials = await VMCredentials.findByVMId(vmId)
-      if (!credentials) {
-        throw new Error('VM credentials not found')
+      // First try to get credentials from vm_credentials table (new approach)
+      let credentials
+      try {
+        credentials = await VMCredentials.findByVMId(vmId)
+      } catch (error) {
+        // If vm_credentials table doesn't exist or no credentials found, fall back to virtual_machines table
+        console.log('[CredentialService] Falling back to virtual_machines table for credentials')
       }
 
-      // Log credential access for audit
+      if (!credentials) {
+        // Fallback: Get credentials directly from virtual_machines table
+        const { pool } = require('../config/database')
+        const result = await pool.query('SELECT username, password FROM virtual_machines WHERE id = $1', [vmId])
+        
+        if (result.rows.length === 0) {
+          throw new Error('VM credentials not found')
+        }
+
+        const vmData = result.rows[0]
+        
+        // Log credential access for audit
+        logger.audit('CREDENTIALS_ACCESSED', {
+          vmId,
+          userId,
+          source: 'virtual_machines_table'
+        })
+
+        const decryptedCredentials = {
+          username: vmData.username,
+          password: vmData.password, // Already in plain text in virtual_machines table
+          privateKey: null,
+          connectionPort: 3389, // Default RDP port
+          connectionType: 'rdp'
+        }
+
+        console.log(`[CredentialService] Retrieved credentials for VM ${vmId} from virtual_machines table:`, {
+          username: decryptedCredentials.username,
+          hasPassword: !!decryptedCredentials.password
+        })
+
+        return decryptedCredentials
+      }
+
+      // Use encrypted credentials from vm_credentials table
       logger.audit('CREDENTIALS_ACCESSED', {
         vmId,
         userId,
-        credentialsId: credentials.id
+        credentialsId: credentials.id,
+        source: 'vm_credentials_table'
       })
 
       const decryptedCredentials = {

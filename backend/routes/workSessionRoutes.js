@@ -1067,8 +1067,15 @@ async function generateAzureRDPFile(vm, userId, sessionId) {
   try {
     credentials = await CredentialService.getConnectionCredentials(vm.id, userId)
     console.log('[RDP Generation] ✅ Credentials found for VM:', vm.id)
+    console.log('[RDP Generation] Credential details:', {
+      username: credentials.username,
+      hasPassword: !!credentials.password,
+      passwordLength: credentials.password ? credentials.password.length : 0,
+      connectionType: credentials.connectionType
+    })
   } catch (err) {
-    console.warn(`[RDP Generation] ⚠️ No credentials found for VM ${vm.id}, creating default credentials. Admin should update these!`)
+    console.warn(`[RDP Generation] ⚠️ No credentials found for VM ${vm.id}, error:`, err.message)
+    console.warn(`[RDP Generation] Creating default credentials. Admin should update these!`)
     await CredentialService.setVMCredentials(vm.id, {
       username: 'defaultuser',
       password: 'changeme123!',
